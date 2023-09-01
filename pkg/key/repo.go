@@ -60,7 +60,7 @@ func (repo Repo) DeleteById(id int) error {
 
 func (repo Repo) IdExists(id int) (bool, error) {
 	var exists bool
-	err := repo.db.QueryRow("SELECT COUNT(*) > 0 FROM api_keys WHERE id = $1", id).Scan(exists)
+	err := repo.db.QueryRow("SELECT COUNT(*) > 0 FROM api_keys WHERE id = $1", id).Scan(&exists)
 	if err != nil {
 		return false, err
 	}

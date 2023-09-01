@@ -24,6 +24,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/health", health.NewHandler(db))
 	mux.Handle("/api-keys", key.NewHandler(db))
+	mux.Handle("/api-keys/", key.NewHandler(db))
 
 	logger.Logger.Info("starting websever")
 	err = http.ListenAndServe(":8080", mux)
