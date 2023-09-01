@@ -13,6 +13,11 @@ import (
 )
 
 func main() {
+	//rootApiKey := getEnvOrPanic("ROOT_API_KEY")
+	//if len(rootApiKey) < 40 {
+	//	panic(errors.New("root API key must be at least 40 characters long"))
+	//}
+
 	logger.Logger.Info("connecting to db")
 	db, err := connectDb()
 	if err != nil {
@@ -29,7 +34,7 @@ func main() {
 	logger.Logger.Info("starting websever")
 	err = http.ListenAndServe(":8080", mux)
 	if err != nil {
-		logger.Logger.Error("failed to start webserver", "error", err)
+		logger.Logger.Error("failed to start webserver", "error", err.Error())
 		panic(err)
 	}
 }

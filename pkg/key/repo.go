@@ -1,6 +1,10 @@
 package key
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+	"strings"
+)
 
 type Repo struct {
 	db *sql.DB
@@ -18,16 +22,6 @@ func (repo Repo) Save(apiKey ApiKey) (ApiKey, error) {
 	}
 	apiKey.Id = id
 	return apiKey, nil
-}
-
-func (repo Repo) NameExists(name string) (bool, error) {
-	var exists bool
-	err := repo.db.QueryRow("SELECT COUNT(*) > 0 FROM api_keys WHERE name = $1;", name).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-
-	return exists, nil
 }
 
 func (repo Repo) FindAll() ([]ApiKey, error) {
@@ -58,11 +52,60 @@ func (repo Repo) DeleteById(id int) error {
 	return err
 }
 
-func (repo Repo) IdExists(id int) (bool, error) {
-	var exists bool
-	err := repo.db.QueryRow("SELECT COUNT(*) > 0 FROM api_keys WHERE id = $1", id).Scan(&exists)
-	if err != nil {
-		return false, err
+type Filters struct {
+	Id     int
+	Name   string
+	ApiKey string
+}
+
+type Condition struct {
+	field string
+	value any
+}
+
+func (repo Repo) FindOneById(id int) (ApiKey, error) {
+	return repo.FindOne(Filters{Id: id})
+}
+
+func (repo Repo) FindOneByName(name string) (ApiKey, error) {
+	return repo.FindOne(Filters{Name: name})
+}
+
+// ToDo simplify logic
+func (repo Repo) FindOne(filters Filters) (ApiKey, error) {
+	query := "SELECT id, name, api_key, created_at FROM api_keys"
+	conditionCounter := 1
+	conditions := []string{}
+	conditionValues := []any{}
+
+	if filters.Id > 0 {
+		conditions = append(conditions, fmt.Sprintf("id = $%d", conditionCounter))
+		conditionValues = append(conditionValues, filters.Id)
+		conditionCounter++
 	}
-	return exists, nil
+
+	if filters.Name != "" {
+		conditions = append(conditions, fmt.Sprintf("name = $%d", conditionCounter))
+		conditionValues = append(conditionValues, filters.Name)
+		conditionCounter++
+	}
+
+	if filters.ApiKey != "" {
+		conditions = append(conditions, fmt.Sprintf("api_key = $%d", conditionCounter))
+		conditionValues = append(conditionValues, filters.ApiKey)
+		conditionCounter++
+	}
+
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	var apiKey ApiKey
+	err := repo.db.QueryRow(query, conditionValues...).Scan(&apiKey.Id, &apiKey.Name, &apiKey.ApiKey,
+		&apiKey.CreatedAt)
+	if err != nil {
+		return ApiKey{}, err
+	}
+
+	return apiKey, nil
 }

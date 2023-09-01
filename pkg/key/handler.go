@@ -5,9 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"github.com/j-dumbell/lite-flag/pkg/array"
-	"github.com/j-dumbell/lite-flag/pkg/logger"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -15,10 +13,11 @@ import (
 
 type iRepo interface {
 	Save(apiKey ApiKey) (ApiKey, error)
-	NameExists(name string) (bool, error)
 	FindAll() ([]ApiKey, error)
 	DeleteById(id int) error
-	IdExists(id int) (bool, error)
+	FindOneById(id int) (ApiKey, error)
+	FindOneByName(name string) (ApiKey, error)
+	FindOne(filters Filters) (ApiKey, error)
 }
 
 type Handler struct {
@@ -49,14 +48,14 @@ func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := h.repo.NameExists(postApiKeyBody.Name)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if exists {
+	_, err := h.repo.FindOneByName(postApiKeyBody.Name)
+	if err == nil {
 		w.WriteHeader(http.StatusConflict)
 		w.Write([]byte("an API key with that name already exists"))
+		return
+	}
+	if err != sql.ErrNoRows {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -80,16 +79,16 @@ func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) delete(w http.ResponseWriter, r *http.Request) {
 	apiKeyId, _ := strconv.Atoi(idPathRegexp.FindStringSubmatch(r.URL.Path)[1])
-	fmt.Println(apiKeyId)
-	exists, err := h.repo.IdExists(apiKeyId)
+	_, err := h.repo.FindOneById(apiKeyId)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		logger.Logger.Error("failed to check ID existance", "error", err.Error())
-		return
-	}
-	if exists == false {
-		w.WriteHeader(http.StatusNotFound)
-		return
+		switch err {
+		case sql.ErrNoRows:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 
 	err = h.repo.DeleteById(apiKeyId)
@@ -120,9 +119,6 @@ func (h Handler) get(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
-
-	fmt.Println("URL path ", r.URL.Path)
-	fmt.Println("matches regex? ", idPathRegexp.MatchString(r.URL.Path))
 
 	switch {
 	case r.Method == http.MethodPost:
