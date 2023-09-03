@@ -16,7 +16,7 @@ func NewRepo(db *sql.DB) Repo {
 
 func (repo Repo) Save(apiKey ApiKey) (ApiKey, error) {
 	var id int
-	err := repo.db.QueryRow("INSERT INTO api_keys (name, api_key, created_at) VALUES ($1, $2, $3) RETURNING id", apiKey.Name, apiKey.ApiKey, apiKey.CreatedAt).Scan(&id)
+	err := repo.db.QueryRow("INSERT INTO api_keys (name, api_key, created_at, role) VALUES ($1, $2, $3, $4) RETURNING id", apiKey.Name, apiKey.ApiKey, apiKey.CreatedAt, apiKey.Role).Scan(&id)
 	if err != nil {
 		return ApiKey{}, err
 	}
@@ -25,7 +25,7 @@ func (repo Repo) Save(apiKey ApiKey) (ApiKey, error) {
 }
 
 func (repo Repo) FindAll() ([]ApiKey, error) {
-	rows, err := repo.db.Query("SELECT id, name, api_key, created_at FROM api_keys;")
+	rows, err := repo.db.Query("SELECT id, name, api_key, created_at, role FROM api_keys;")
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (repo Repo) FindAll() ([]ApiKey, error) {
 	for rows.Next() {
 		var apiKey ApiKey
 		if err := rows.Scan(&apiKey.Id, &apiKey.Name, &apiKey.ApiKey,
-			&apiKey.CreatedAt); err != nil {
+			&apiKey.CreatedAt, &apiKey.Role); err != nil {
 			return apiKeys, err
 		}
 		apiKeys = append(apiKeys, apiKey)
@@ -71,9 +71,13 @@ func (repo Repo) FindOneByName(name string) (ApiKey, error) {
 	return repo.FindOne(Filters{Name: name})
 }
 
+func (repo Repo) FindOneByKey(key string) (ApiKey, error) {
+	return repo.FindOne(Filters{ApiKey: key})
+}
+
 // ToDo simplify logic
 func (repo Repo) FindOne(filters Filters) (ApiKey, error) {
-	query := "SELECT id, name, api_key, created_at FROM api_keys"
+	query := "SELECT id, name, api_key, created_at, role FROM api_keys"
 	conditionCounter := 1
 	conditions := []string{}
 	conditionValues := []any{}
@@ -99,10 +103,10 @@ func (repo Repo) FindOne(filters Filters) (ApiKey, error) {
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-
+	
 	var apiKey ApiKey
 	err := repo.db.QueryRow(query, conditionValues...).Scan(&apiKey.Id, &apiKey.Name, &apiKey.ApiKey,
-		&apiKey.CreatedAt)
+		&apiKey.CreatedAt, &apiKey.Role)
 	if err != nil {
 		return ApiKey{}, err
 	}

@@ -7,6 +7,7 @@ type ApiKey struct {
 	Name      string    `json:"name"`
 	ApiKey    string    `json:"apiKey"`
 	CreatedAt time.Time `json:"createdAt"`
+	Role      Role      `json:"role"`
 }
 
 func New(name string) ApiKey {

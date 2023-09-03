@@ -6,7 +6,7 @@ import (
 )
 
 // ToDo - where should this live?
-func AssertDeepEqual(t *testing.T, expected any, actual any) {
+func AssertDeepEqual(t *testing.T, actual any, expected any) {
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("expected %v, got %v", expected, actual)
 	}
@@ -29,20 +29,20 @@ func TestArrMap1(t *testing.T) {
 		ints := []int{1, 2, 3}
 		actual := ArrMap(ints, square)
 		expected := []int{1, 4, 9}
-		AssertDeepEqual(t, actual, expected)
+		AssertDeepEqual(t, expected, actual)
 	})
 
 	t.Run("empty slice", func(t *testing.T) {
 		arr := []int{}
 		actual := ArrMap(arr, square)
 		expected := []int{}
-		AssertDeepEqual(t, actual, expected)
+		AssertDeepEqual(t, expected, actual)
 	})
 
 	t.Run("string -> struct", func(t *testing.T) {
 		arr := []string{"a", "b", "c"}
 		actual := ArrMap(arr, stringToStruct)
 		expected := []someStruct{{"a"}, {"b"}, {"c"}}
-		AssertDeepEqual(t, actual, expected)
+		AssertDeepEqual(t, expected, actual)
 	})
 }

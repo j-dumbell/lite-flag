@@ -2,7 +2,9 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"github.com/j-dumbell/lite-flag/pkg/auth"
 	"github.com/j-dumbell/lite-flag/pkg/health"
 	"github.com/j-dumbell/lite-flag/pkg/key"
 	"github.com/j-dumbell/lite-flag/pkg/logger"
@@ -13,11 +15,6 @@ import (
 )
 
 func main() {
-	//rootApiKey := getEnvOrPanic("ROOT_API_KEY")
-	//if len(rootApiKey) < 40 {
-	//	panic(errors.New("root API key must be at least 40 characters long"))
-	//}
-
 	logger.Logger.Info("connecting to db")
 	db, err := connectDb()
 	if err != nil {
@@ -26,9 +23,20 @@ func main() {
 	}
 	defer db.Close()
 
+	rootApiKey := getEnvOrPanic("ROOT_API_KEY")
+	if len(rootApiKey) < 40 {
+		panic(errors.New("root API key must be at least 40 characters long"))
+	}
+	err = key.InsertRoot(key.NewRepo(db), rootApiKey)
+	if err != nil {
+		logger.Logger.Error("failed to apply root API key", "error", err.Error())
+		panic(err)
+	}
+
+	authMiddleware := auth.NewMiddleware(key.NewRepo(db))
 	mux := http.NewServeMux()
 	mux.Handle("/health", health.NewHandler(db))
-	mux.Handle("/api-keys", key.NewHandler(db))
+	mux.Handle("/api-keys", authMiddleware.Wrap(key.NewHandler(db), []key.Role{key.Root, key.Admin}))
 	mux.Handle("/api-keys/", key.NewHandler(db))
 
 	logger.Logger.Info("starting websever")

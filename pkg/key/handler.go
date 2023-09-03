@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 type iRepo interface {
@@ -30,9 +31,14 @@ func NewHandler(db *sql.DB) Handler {
 
 type postReqBody struct {
 	Name string `json:"name"`
+	Role Role   `json:"role"`
 }
 
-var idPathRegexp = regexp.MustCompile(`\/api-keys\/(\d+)$`)
+func (body postReqBody) isValid() bool {
+	return body.Name != "" && body.Role.isValid()
+}
+
+var idPathRegexp = regexp.MustCompile(`^\/api-keys\/(\d+)$`)
 
 func newKey() string {
 	b := make([]byte, 40)
@@ -42,7 +48,7 @@ func newKey() string {
 
 func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 	var postApiKeyBody postReqBody
-	if err := json.NewDecoder(r.Body).Decode(&postApiKeyBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&postApiKeyBody); err != nil || !postApiKeyBody.isValid() {
 		w.WriteHeader(http.StatusBadRequest)
 		//ToDo - return error message in body.  Validation library?
 		return
@@ -59,7 +65,7 @@ func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKeyModel := New(postApiKeyBody.Name)
+	apiKeyModel := ApiKey{Name: postApiKeyBody.Name, ApiKey: newKey(), CreatedAt: time.Now(), Role: postApiKeyBody.Role}
 
 	apiKeyModel, err = h.repo.Save(apiKeyModel)
 	if err != nil {
@@ -79,7 +85,7 @@ func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) delete(w http.ResponseWriter, r *http.Request) {
 	apiKeyId, _ := strconv.Atoi(idPathRegexp.FindStringSubmatch(r.URL.Path)[1])
-	_, err := h.repo.FindOneById(apiKeyId)
+	existingApiKey, err := h.repo.FindOneById(apiKeyId)
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
@@ -89,6 +95,12 @@ func (h Handler) delete(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+	}
+	if existingApiKey.Role == Root {
+		//ToDo check this is the correct status code
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("cannot delete root API key"))
+		return
 	}
 
 	err = h.repo.DeleteById(apiKeyId)
@@ -127,7 +139,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodDelete && idPathRegexp.MatchString(r.URL.Path):
 		h.delete(w, r)
 
-	case r.Method == http.MethodGet:
+	case r.Method == http.MethodGet && !idPathRegexp.MatchString(r.URL.Path):
 		h.get(w, r)
 
 	default:
