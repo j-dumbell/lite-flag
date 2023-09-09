@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"github.com/j-dumbell/lite-flag/pkg/array"
 	"net/http"
 	"regexp"
@@ -34,8 +35,18 @@ type postReqBody struct {
 	Role Role   `json:"role"`
 }
 
-func (body postReqBody) isValid() bool {
-	return body.Name != "" && body.Role.isValid()
+// ToDo - collect all errors?
+func (body postReqBody) validate() error {
+	if body.Name == "" {
+		return errors.New("name must be provided")
+	}
+	if body.Role == "" {
+		return errors.New("role must be provided")
+	}
+	if !body.Role.isValid() {
+		return errors.New("role is invalid")
+	}
+	return nil
 }
 
 var idPathRegexp = regexp.MustCompile(`^\/api-keys\/(\d+)$`)
@@ -48,15 +59,21 @@ func newKey() string {
 
 func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 	var postApiKeyBody postReqBody
-	if err := json.NewDecoder(r.Body).Decode(&postApiKeyBody); err != nil || !postApiKeyBody.isValid() {
+	if err := json.NewDecoder(r.Body).Decode(&postApiKeyBody); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		//ToDo - return error message in body.  Validation library?
+		return
+	}
+	if err := postApiKeyBody.validate(); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		//ToDo json structure
+		w.Write([]byte(err.Error()))
 		return
 	}
 
 	_, err := h.repo.FindOneByName(postApiKeyBody.Name)
 	if err == nil {
 		w.WriteHeader(http.StatusConflict)
+		//ToDo json structure
 		w.Write([]byte("an API key with that name already exists"))
 		return
 	}

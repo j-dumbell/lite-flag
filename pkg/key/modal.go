@@ -10,15 +10,12 @@ type ApiKey struct {
 	Role      Role      `json:"role"`
 }
 
-func New(name string) ApiKey {
-	return ApiKey{Name: name, ApiKey: newKey(), CreatedAt: time.Now()}
-}
-
 // ToDo where should this live?
 type GetApiKeysResp struct {
 	Id        int       `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"createdAt"`
+	Role      Role      `json:"role"`
 }
 
 func RemoveKey(apiKey ApiKey) GetApiKeysResp {
@@ -26,5 +23,6 @@ func RemoveKey(apiKey ApiKey) GetApiKeysResp {
 		Id:        apiKey.Id,
 		Name:      apiKey.Name,
 		CreatedAt: apiKey.CreatedAt,
+		Role:      apiKey.Role,
 	}
 }
