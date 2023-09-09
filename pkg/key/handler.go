@@ -26,8 +26,8 @@ type Handler struct {
 	repo iRepo
 }
 
-func NewHandler(db *sql.DB) Handler {
-	return Handler{repo: NewRepo(db)}
+func NewHandler(repo iRepo) Handler {
+	return Handler{repo: repo}
 }
 
 type postReqBody struct {
