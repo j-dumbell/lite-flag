@@ -2,8 +2,7 @@ package fflag
 
 import (
 	"database/sql"
-	"fmt"
-	"strings"
+	"time"
 )
 
 type Repo struct {
@@ -16,52 +15,124 @@ func NewRepo(db *sql.DB) Repo {
 	}
 }
 
-func (repo Repo) Save(flag Flag) (Flag, error) {
-	var id int
-	err := repo.db.QueryRow("INSERT INTO flags (name, created_at) VALUES ($1, $2) RETURNING id", flag.Name, flag.CreatedAt).Scan(&id)
+func (repo Repo) Save(flag Flag) error {
+	tx, err := repo.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("INSERT INTO flags (name, created_at) VALUES ($1, $2)", flag.Name, flag.CreatedAt)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if flag.Schedule == nil {
+		_, err = tx.Exec("INSERT INTO transitions (flag_name, to_state, effective_from) VALUES ($1, $2, $3)", flag.Name, flag.Enabled, time.Now())
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	} else {
+		_, err = tx.Exec("INSERT INTO transitions (flag_name, to_state, effective_from) VALUES ($1, $2, $3)", flag.Name, flag.Schedule.ToState, flag.Schedule.EffectiveFrom)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func parseQueryResult(rows *sql.Rows) ([]Flag, error) {
+	defer rows.Close()
+
+	var flags []Flag
+	for rows.Next() {
+		var flag Flag
+		var scheduleToState sql.NullBool
+		var scheduleEffectiveFrom sql.NullTime
+
+		if err := rows.Scan(&flag.Name, &flag.CreatedAt, &flag.Enabled, &scheduleToState, &scheduleEffectiveFrom); err != nil {
+			return nil, err
+		}
+
+		if scheduleEffectiveFrom.Valid {
+			flag.Schedule = &Schedule{
+				ToState:       scheduleToState.Bool,
+				EffectiveFrom: scheduleEffectiveFrom.Time,
+			}
+		} else {
+			flag.Schedule = nil
+		}
+
+		flags = append(flags, flag)
+	}
+
+	return flags, nil
+}
+
+const findQuery = `
+	WITH current_state AS (
+		SELECT t.flag_name, t.to_state, t.effective_from
+		FROM transitions t 
+		INNER JOIN (
+			SELECT flag_name, MAX(effective_from) as effective_from
+			FROM transitions
+			WHERE effective_from <= NOW()
+			GROUP BY flag_name
+		) m
+			ON t.flag_name = m.flag_name
+			AND t.effective_from = m.effective_from
+	),
+	
+	schedule AS (
+		SELECT t.flag_name, t.to_state, t.effective_from
+		FROM transitions t 
+		INNER JOIN (
+			SELECT flag_name, MAX(effective_from) as effective_from
+			FROM transitions
+			WHERE effective_from > NOW()
+			GROUP BY flag_name
+		) m
+			ON t.flag_name = m.flag_name
+			AND t.effective_from = m.effective_from
+	)
+	
+	SELECT f.name, f.created_at, c.to_state, s.to_state, s.effective_from
+	FROM flags f 
+	LEFT JOIN current_state c 
+		ON f.name = c.flag_name 
+	LEFT JOIN schedule s
+		ON f.name = s.flag_name
+`
+
+func (repo Repo) FindAll() ([]Flag, error) {
+	rows, err := repo.db.Query(findQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseQueryResult(rows)
+}
+
+func (repo Repo) FindOne(name string) (Flag, error) {
+	query := findQuery + " WHERE f.name = $1"
+	rows, err := repo.db.Query(query, name)
 	if err != nil {
 		return Flag{}, err
 	}
-	flag.ID = id
-	return flag, nil
-}
 
-type Filters struct {
-	ID   *string
-	Name *string
-}
-
-func (repo Repo) FindOne(filters Filters) (Flag, error) {
-	query := "SELECT id, name, created_at FROM flags"
-	conditionCounter := 1
-	conditions := []string{}
-	conditionValues := []any{}
-
-	if filters.ID != nil {
-		conditions = append(conditions, fmt.Sprintf("id = $%d", conditionCounter))
-		conditionValues = append(conditionValues, *filters.ID)
-		conditionCounter++
-	}
-
-	if filters.Name != nil {
-		conditions = append(conditions, fmt.Sprintf("name = $%d", conditionCounter))
-		conditionValues = append(conditionValues, *filters.Name)
-		conditionCounter++
-	}
-
-	if len(conditions) > 0 {
-		query += " WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	var flag Flag
-	err := repo.db.QueryRow(query, conditionValues...).Scan(&flag.ID, &flag.Name, &flag.CreatedAt)
+	flags, err := parseQueryResult(rows)
 	if err != nil {
 		return Flag{}, err
 	}
-
-	return flag, nil
-}
-
-func (repo Repo) FindOneByName(name string) (Flag, error) {
-	return repo.FindOne(Filters{Name: &name})
+	if len(flags) == 0 {
+		return Flag{}, sql.ErrNoRows
+	}
+	return flags[0], nil
 }

@@ -44,6 +44,7 @@ func (repo Repo) FindAll() ([]ApiKey, error) {
 	if err = rows.Err(); err != nil {
 		return apiKeys, err
 	}
+
 	return apiKeys, nil
 }
 

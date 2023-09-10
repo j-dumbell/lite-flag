@@ -23,6 +23,7 @@ func New(db *sql.DB) *http.ServeMux {
 	mux.Handle("/api-keys", authMiddleware.Wrap(keyHandler, []key.Role{key.Root, key.Admin}))
 	mux.Handle("/api-keys/", keyHandler)
 	mux.Handle("/flags", authMiddleware.Wrap(flagHandler, []key.Role{key.Root, key.Admin}))
+	mux.Handle("/flags/", authMiddleware.Wrap(flagHandler, []key.Role{key.Root, key.Admin}))
 
 	return mux
 }
