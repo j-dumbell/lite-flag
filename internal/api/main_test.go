@@ -13,6 +13,7 @@ import (
 
 var testDB *sql.DB
 var api *chi.Mux
+var cipherKey = []byte("1234567890abcdef")
 
 func TestMain(m *testing.M) {
 	db, err := pg.Connect(pg.ConnOptions{
@@ -34,7 +35,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	api = New(testDB)
+	api = New(testDB, []byte("0123456789abcdef"))
 
 	code := m.Run()
 	os.Exit(code)

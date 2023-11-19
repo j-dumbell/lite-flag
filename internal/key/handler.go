@@ -85,7 +85,6 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apiKeyModel := ApiKey{ID: postApiKeyBody.ID, ApiKey: newKey(), CreatedAt: time.Now(), Role: postApiKeyBody.Role}
-
 	err = h.repo.Save(apiKeyModel)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

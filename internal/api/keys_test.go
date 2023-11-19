@@ -14,7 +14,7 @@ import (
 )
 
 func TestGetKeys(t *testing.T) {
-	keyRepo := key.NewRepo(testDB)
+	keyRepo := key.NewRepo(testDB, cipherKey)
 
 	key1 := key.ApiKey{
 		ID:     "key-1",
@@ -105,7 +105,7 @@ func TestPostKey_InvalidReq(t *testing.T) {
 }
 
 func TestDeleteKey(t *testing.T) {
-	keyRepo := key.NewRepo(testDB)
+	keyRepo := key.NewRepo(testDB, cipherKey)
 
 	keyName := "blah-key"
 	err := keyRepo.Save(key.ApiKey{
