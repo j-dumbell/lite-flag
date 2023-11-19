@@ -2,9 +2,10 @@ package auth
 
 import (
 	"database/sql"
-	"github.com/j-dumbell/lite-flag/pkg/array"
-	"github.com/j-dumbell/lite-flag/pkg/key"
 	"net/http"
+	"slices"
+
+	"github.com/j-dumbell/lite-flag/internal/key"
 )
 
 type ApiKeyRepo interface {
@@ -36,7 +37,7 @@ func (middleware Middleware) Wrap(handler http.Handler, roles []key.Role) http.H
 				w.WriteHeader(http.StatusInternalServerError)
 			}
 		}
-		if !array.Includes(roles, apiKey.Role) {
+		if !slices.Contains(roles, apiKey.Role) {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}

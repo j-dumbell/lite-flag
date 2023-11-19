@@ -3,8 +3,9 @@ package key
 import (
 	"database/sql"
 	"errors"
-	"github.com/j-dumbell/lite-flag/pkg/logger"
 	"time"
+
+	"github.com/j-dumbell/lite-flag/internal/logger"
 )
 
 // ToDo - move to key service?
@@ -19,12 +20,12 @@ func InsertRoot(repo Repo, key string) error {
 	}
 
 	logger.Logger.Info("some root API key already exists; deleting")
-	if err = repo.DeleteById(existingRoot.Id); err != nil {
+	if err = repo.DeleteByID(existingRoot.ID); err != nil {
 		return err
 	}
 
 	logger.Logger.Info("inserting root API key")
-	if _, err = repo.Save(ApiKey{Name: "root", ApiKey: key, CreatedAt: time.Now(), Role: Root}); err != nil {
+	if err = repo.Save(ApiKey{ID: "root", ApiKey: key, Role: Root, CreatedAt: time.Now()}); err != nil {
 		return err
 	}
 
