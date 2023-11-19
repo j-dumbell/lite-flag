@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/j-dumbell/lite-flag/internal/bootstrap"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
 	_ "github.com/lib/pq"
 )
@@ -27,13 +28,13 @@ func TestMain(m *testing.M) {
 	}
 	testDB = db
 	defer testDB.Close()
-	api = New(testDB)
 
-	_, err = db.Exec("DELETE FROM flags")
-	_, err = db.Exec("DELETE FROM api_keys")
+	err = bootstrap.Run(testDB)
 	if err != nil {
 		panic(err)
 	}
+
+	api = New(testDB)
 
 	code := m.Run()
 	os.Exit(code)
