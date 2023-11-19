@@ -1,6 +1,8 @@
 package key
 
-import "github.com/j-dumbell/lite-flag/pkg/array"
+import (
+	"slices"
+)
 
 type Role string
 
@@ -11,5 +13,5 @@ const (
 )
 
 func (role Role) isValid() bool {
-	return array.Includes([]Role{Root, Admin, Readonly}, role)
+	return slices.Contains([]Role{Root, Admin, Readonly}, role)
 }

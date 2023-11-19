@@ -6,19 +6,19 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/j-dumbell/lite-flag/pkg/array"
 	"net/http"
-	"regexp"
-	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/j-dumbell/lite-flag/pkg/array"
 )
 
 type iRepo interface {
-	Save(apiKey ApiKey) (ApiKey, error)
+	Save(apiKey ApiKey) error
 	FindAll() ([]ApiKey, error)
-	DeleteById(id int) error
-	FindOneById(id int) (ApiKey, error)
-	FindOneByName(name string) (ApiKey, error)
+	DeleteByID(id string) error
+	FindOneByID(id string) (ApiKey, error)
+	FindOneByKey(key string) (ApiKey, error)
 	FindOne(filters Filters) (ApiKey, error)
 }
 
@@ -30,14 +30,14 @@ func NewHandler(repo iRepo) Handler {
 	return Handler{repo: repo}
 }
 
-type postReqBody struct {
-	Name string `json:"name"`
+type PostReqBody struct {
+	ID   string `json:"id"`
 	Role Role   `json:"role"`
 }
 
 // ToDo - collect all errors?
-func (body postReqBody) validate() error {
-	if body.Name == "" {
+func (body PostReqBody) Validate() error {
+	if body.ID == "" {
 		return errors.New("name must be provided")
 	}
 	if body.Role == "" {
@@ -49,32 +49,34 @@ func (body postReqBody) validate() error {
 	return nil
 }
 
-var idPathRegexp = regexp.MustCompile(`^\/api-keys\/(\d+)$`)
-
 func newKey() string {
 	b := make([]byte, 40)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
-func (h Handler) post(w http.ResponseWriter, r *http.Request) {
-	var postApiKeyBody postReqBody
+func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	var postApiKeyBody PostReqBody
 	if err := json.NewDecoder(r.Body).Decode(&postApiKeyBody); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if err := postApiKeyBody.validate(); err != nil {
+	if err := postApiKeyBody.Validate(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		//ToDo json structure
+		// ToDo json structure
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	_, err := h.repo.FindOneByName(postApiKeyBody.Name)
+	_, err := h.repo.FindOneByID(postApiKeyBody.ID)
 	if err == nil {
 		w.WriteHeader(http.StatusConflict)
-		//ToDo json structure
-		w.Write([]byte("an API key with that name already exists"))
+		bytes, err := json.Marshal(errors.New("an API key with that id already exists"))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		w.Write(bytes)
 		return
 	}
 	if err != sql.ErrNoRows {
@@ -82,9 +84,9 @@ func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKeyModel := ApiKey{Name: postApiKeyBody.Name, ApiKey: newKey(), CreatedAt: time.Now(), Role: postApiKeyBody.Role}
+	apiKeyModel := ApiKey{ID: postApiKeyBody.ID, ApiKey: newKey(), CreatedAt: time.Now(), Role: postApiKeyBody.Role}
 
-	apiKeyModel, err = h.repo.Save(apiKeyModel)
+	err = h.repo.Save(apiKeyModel)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -100,9 +102,10 @@ func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 	w.Write(bytes)
 }
 
-func (h Handler) delete(w http.ResponseWriter, r *http.Request) {
-	apiKeyId, _ := strconv.Atoi(idPathRegexp.FindStringSubmatch(r.URL.Path)[1])
-	existingApiKey, err := h.repo.FindOneById(apiKeyId)
+func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	keyID := chi.URLParam(r, "keyID")
+
+	_, err := h.repo.FindOneByID(keyID)
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
@@ -113,14 +116,8 @@ func (h Handler) delete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if existingApiKey.Role == Root {
-		//ToDo check this is the correct status code
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("cannot delete root API key"))
-		return
-	}
 
-	err = h.repo.DeleteById(apiKeyId)
+	err = h.repo.DeleteByID(keyID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -129,14 +126,23 @@ func (h Handler) delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h Handler) get(w http.ResponseWriter, r *http.Request) {
+type GetApiKeysResponse struct {
+	Keys []ApiKeyRedacted `json:"keys"`
+}
+
+func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+
 	apiKeys, err := h.repo.FindAll()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
 	redactedKeys := array.ArrMap(apiKeys, RemoveKey)
-	bytes, err := json.Marshal(redactedKeys)
+	bytes, err := json.Marshal(GetApiKeysResponse{
+		Keys: redactedKeys,
+	})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -144,22 +150,4 @@ func (h Handler) get(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	w.Write(bytes)
-}
-
-func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-
-	switch {
-	case r.Method == http.MethodPost:
-		h.post(w, r)
-
-	case r.Method == http.MethodDelete && idPathRegexp.MatchString(r.URL.Path):
-		h.delete(w, r)
-
-	case r.Method == http.MethodGet && !idPathRegexp.MatchString(r.URL.Path):
-		h.get(w, r)
-
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-	}
 }

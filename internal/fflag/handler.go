@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type IRepo interface {
 	Save(flag Flag) error
-	FindOne(name string) (Flag, error)
+	FindOne(id string) (Flag, error)
 	FindAll() ([]Flag, error)
+	Delete(id string) error
 }
 
 type Handler struct {
@@ -26,30 +28,30 @@ func NewHandler(repo IRepo) Handler {
 	}
 }
 
-type postReqBody struct {
-	Name string `json:"name"`
+type PostReqBody struct {
+	ID string `json:"id"`
 }
 
-func (body postReqBody) validate() error {
-	if strings.ContainsRune(body.Name, ' ') || strings.ContainsRune(body.Name, '/') {
+func (body PostReqBody) Validate() error {
+	if strings.ContainsRune(body.ID, ' ') || strings.ContainsRune(body.ID, '/') {
 		return errors.New("name can only contain letters, numbers, hyphens or underscores")
 	}
 	return nil
 }
 
-func (h Handler) post(w http.ResponseWriter, r *http.Request) {
-	var body postReqBody
+func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
+	var body PostReqBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if err := body.validate(); err != nil {
+	if err := body.Validate(); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
 	}
 
-	_, err := h.repo.FindOne(body.Name)
+	_, err := h.repo.FindOne(body.ID)
 	if err == nil {
 		w.WriteHeader(http.StatusConflict)
 		return
@@ -60,10 +62,9 @@ func (h Handler) post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	flag := Flag{
-		Name:      body.Name,
+		ID:        body.ID,
 		Enabled:   false,
 		CreatedAt: time.Now(),
-		Schedule:  nil,
 	}
 
 	err = h.repo.Save(flag)
@@ -86,14 +87,14 @@ type GetResponse struct {
 	Flags []Flag `json:"flags"`
 }
 
-func (h Handler) getAll(w http.ResponseWriter, r *http.Request) {
+func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	flags, err := h.repo.FindAll()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	bytes, err := json.Marshal(flags)
+	bytes, err := json.Marshal(GetResponse{Flags: flags})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -103,8 +104,8 @@ func (h Handler) getAll(w http.ResponseWriter, r *http.Request) {
 	w.Write(bytes)
 }
 
-func (h Handler) getOne(w http.ResponseWriter, r *http.Request) {
-	name := namePathRegexp.FindStringSubmatch(r.URL.Path)[1]
+func (h Handler) GetOne(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "flagID")
 
 	flag, err := h.repo.FindOne(name)
 	if err == sql.ErrNoRows {
@@ -126,25 +127,24 @@ func (h Handler) getOne(w http.ResponseWriter, r *http.Request) {
 	w.Write(bytes)
 }
 
-var namePathRegexp = regexp.MustCompile(`^\/flags\/([A-z0-9-_]+)$`)
+func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "flagID")
 
-func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if namePathRegexp.MatchString(r.URL.Path) {
-		switch r.Method {
-		case http.MethodGet:
-			h.getOne(w, r)
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
+	_, err := h.repo.FindOne(name)
+	if err == sql.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
 		return
-	} else {
-		switch r.Method {
-		case http.MethodPost:
-			h.post(w, r)
-		case http.MethodGet:
-			h.getAll(w, r)
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
 	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = h.repo.Delete(name)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

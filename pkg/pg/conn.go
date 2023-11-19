@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// ConnOptions contains the parameters required to connect to a Postgres DB.
 type ConnOptions struct {
 	DBName   string
 	Username string
@@ -14,6 +15,7 @@ type ConnOptions struct {
 	SSLMode  bool
 }
 
+// Connect connects to a Postgres DB using the provided connection options.
 func Connect(options ConnOptions) (*sql.DB, error) {
 	var sslMode string
 	if options.SSLMode {
