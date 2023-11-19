@@ -23,14 +23,15 @@ func main() {
 	defer db.Close()
 
 	rootApiKey := getEnvOrPanic("ROOT_API_KEY")
-	err = key.InsertRoot(key.NewRepo(db), rootApiKey)
+	cipherKey := []byte(getEnvOrPanic("CIPHER_KEY"))
+	err = key.InsertRoot(key.NewRepo(db, cipherKey), rootApiKey)
 	if err != nil {
 		logger.Logger.Error("failed to apply root API key", "error", err.Error())
 		panic(err)
 	}
 
 	logger.Logger.Info("starting websever")
-	mux := api.New(db)
+	mux := api.New(db, cipherKey)
 	err = http.ListenAndServe(":8080", mux)
 	if err != nil {
 		logger.Logger.Error("failed to start webserver", "error", err.Error())

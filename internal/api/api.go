@@ -10,9 +10,9 @@ import (
 	"github.com/j-dumbell/lite-flag/internal/key"
 )
 
-func New(db *sql.DB) *chi.Mux {
+func New(db *sql.DB, cipherKey []byte) *chi.Mux {
 	flagRepo := fflag.NewRepo(db)
-	keyRepo := key.NewRepo(db)
+	keyRepo := key.NewRepo(db, cipherKey)
 
 	healthHander := health.NewHandler(db)
 	flagHandler := fflag.NewHandler(&flagRepo)

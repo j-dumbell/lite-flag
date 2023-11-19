@@ -9,8 +9,8 @@ import (
 )
 
 // ToDo - move to key service?
-func InsertRoot(repo Repo, key string) error {
-	if len(key) < 40 {
+func InsertRoot(repo Repo, apiKey string) error {
+	if len(apiKey) < 40 {
 		return errors.New("root API key must be at least 40 characters long")
 	}
 
@@ -25,7 +25,10 @@ func InsertRoot(repo Repo, key string) error {
 	}
 
 	logger.Logger.Info("inserting root API key")
-	if err = repo.Save(ApiKey{ID: "root", ApiKey: key, Role: Root, CreatedAt: time.Now()}); err != nil {
+	if err != nil {
+		return err
+	}
+	if err = repo.Save(ApiKey{ID: "root", ApiKey: apiKey, Role: Root, CreatedAt: time.Now()}); err != nil {
 		return err
 	}
 
