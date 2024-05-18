@@ -16,9 +16,34 @@ func NewRepo(db *sql.DB) Repo {
 	}
 }
 
-func (repo *Repo) Save(flag Flag) error {
-	_, err := repo.db.Exec("INSERT INTO flags (id, enabled, created_at) VALUES ($1, $2, $3)", flag.ID, flag.Enabled, flag.CreatedAt)
-	return pg.ParseError(err)
+func (repo *Repo) Create(params UpsertFlagParams) (Flag, error) {
+	var id int
+	err := repo.db.QueryRow("INSERT INTO flags (name, enabled) VALUES ($1, $2) RETURNING id", params.Name, params.Enabled).Scan(&id)
+	if err != nil {
+		return Flag{}, pg.ParseError(err)
+	}
+
+	flag := Flag{
+		ID:      uint32(id),
+		Name:    params.Name,
+		Enabled: params.Enabled,
+	}
+	return flag, nil
+}
+
+func (repo *Repo) Update(flag Flag) (Flag, error) {
+	_, err := repo.db.Exec("UPDATE flags SET name = $1, enabled = $2 WHERE id = $3", flag.Name, flag.Enabled, flag.ID)
+	if err != nil {
+		return Flag{}, pg.ParseError(err)
+	}
+
+	updatedFlag := Flag{
+		ID:      flag.ID,
+		Name:    flag.Name,
+		Enabled: flag.Enabled,
+	}
+
+	return updatedFlag, nil
 }
 
 func parseQueryResult(rows *sql.Rows) ([]Flag, error) {
@@ -28,7 +53,7 @@ func parseQueryResult(rows *sql.Rows) ([]Flag, error) {
 	for rows.Next() {
 		var flag Flag
 
-		if err := rows.Scan(&flag.ID, &flag.Enabled, &flag.CreatedAt); err != nil {
+		if err := rows.Scan(&flag.ID, &flag.Name, &flag.Enabled); err != nil {
 			return nil, err
 		}
 
@@ -39,7 +64,7 @@ func parseQueryResult(rows *sql.Rows) ([]Flag, error) {
 }
 
 func (repo *Repo) FindAll() ([]Flag, error) {
-	rows, err := repo.db.Query("SELECT id, enabled, created_at FROM flags;")
+	rows, err := repo.db.Query("SELECT id, name, enabled FROM flags;")
 	if err != nil {
 		return nil, pg.ParseError(err)
 	}
@@ -47,8 +72,8 @@ func (repo *Repo) FindAll() ([]Flag, error) {
 	return parseQueryResult(rows)
 }
 
-func (repo *Repo) FindOne(id string) (Flag, error) {
-	rows, err := repo.db.Query("SELECT id, enabled, created_at FROM flags WHERE id = $1;", id)
+func (repo *Repo) FindOne(id uint32) (Flag, error) {
+	rows, err := repo.db.Query("SELECT id, name, enabled FROM flags WHERE id = $1;", id)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}
@@ -63,7 +88,7 @@ func (repo *Repo) FindOne(id string) (Flag, error) {
 	return flags[0], nil
 }
 
-func (repo *Repo) Delete(id string) error {
+func (repo *Repo) Delete(id uint32) error {
 	_, err := repo.db.Query("DELETE FROM flags WHERE id = $1;", id)
 	return pg.ParseError(err)
 }

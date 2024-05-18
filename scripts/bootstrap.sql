@@ -1,4 +1,4 @@
-DROP TYPE IF EXISTS role;
+DROP TYPE IF EXISTS role CASCADE;
 CREATE TYPE role AS ENUM ('root', 'admin', 'readonly');
 
 DROP TABLE IF EXISTS api_keys;
@@ -11,7 +11,7 @@ CREATE TABLE api_keys (
 
 DROP TABLE IF EXISTS flags;
 CREATE TABLE flags (
-    id VARCHAR PRIMARY KEY,
-    enabled BOOLEAN NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL
+    id          SERIAL PRIMARY KEY,
+    name        VARCHAR NOT NULL UNIQUE,
+    enabled     BOOLEAN NOT NULL
 );

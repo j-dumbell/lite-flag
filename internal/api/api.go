@@ -6,18 +6,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
-	"github.com/j-dumbell/lite-flag/internal/health"
-	"github.com/j-dumbell/lite-flag/internal/key"
+	"github.com/j-dumbell/lite-flag/pkg/chix"
 )
 
-func New(db *sql.DB, cipherKey []byte) *chi.Mux {
-	flagRepo := fflag.NewRepo(db)
-	keyRepo := key.NewRepo(db, cipherKey)
+type API struct {
+	db          *sql.DB
+	flagService fflag.Service
+}
 
-	healthHander := health.NewHandler(db)
-	flagHandler := fflag.NewHandler(&flagRepo)
-	keyHandler := key.NewHandler(&keyRepo)
+func New(db *sql.DB, flagService fflag.Service) API {
+	return API{
+		db:          db,
+		flagService: flagService,
+	}
+}
 
+func (api *API) NewRouter() *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -25,15 +29,12 @@ func New(db *sql.DB, cipherKey []byte) *chi.Mux {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/health", healthHander.Get)
+	chix.RegisterGet(r, "/healthz", api.Healthcheck)
 
-	r.Get("/flags", flagHandler.Get)
-	r.Post("/flags", flagHandler.Post)
-	r.Get("/flags/{flagID}", flagHandler.GetOne)
-	r.Delete("/flags/{flagID}", flagHandler.Delete)
+	chix.RegisterGet(r, "/flags", api.GetFlags)
+	chix.RegisterPost(r, "/flags", api.PostFlag)
+	chix.RegisterGet(r, "/flags/{id}", api.GetFlag)
+	chix.RegisterDelete(r, "/flags/{id}", api.DeleteFlag)
 
-	r.Get("/api-keys", keyHandler.Get)
-	r.Post("/api-keys", keyHandler.Post)
-	r.Delete("/api-keys/{keyID}", keyHandler.Delete)
 	return r
 }
