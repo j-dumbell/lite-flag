@@ -1,58 +1,55 @@
 package main
 
 import (
-	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 
+	"github.com/j-dumbell/lite-flag/internal/api"
+	"github.com/j-dumbell/lite-flag/internal/fflag"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
 	_ "github.com/lib/pq"
+	"github.com/rs/zerolog/log"
 )
 
+const serverAddress = ":8080"
+
 func main() {
-	// logger.Logger.Info("connecting to db")
-	// db, err := pg.Connect(mkPGOptions())
-	// if err != nil {
-	// 	logger.Logger.Error("failed to connect to DB", "error", err)
-	// 	panic(err)
-	// }
-	// defer db.Close()
-	//
-	// rootApiKey := getEnvOrPanic("ROOT_API_KEY")
-	// cipherKey := []byte(getEnvOrPanic("CIPHER_KEY"))
-	// err = key.InsertRoot(key.NewRepo(db, cipherKey), rootApiKey)
-	// if err != nil {
-	// 	logger.Logger.Error("failed to apply root API key", "error", err.Error())
-	// 	panic(err)
-	// }
-	//
-	// logger.Logger.Info("starting websever")
-	// mux := api.New(db, cipherKey)
-	// err = http.ListenAndServe(":8080", mux)
-	// if err != nil {
-	// 	logger.Logger.Error("failed to start webserver", "error", err.Error())
-	// 	panic(err)
-	// }
+	db, err := pg.Connect(mkPGOptions())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to DB")
+	}
+	defer db.Close()
+
+	flagRepo := fflag.NewRepo(db)
+	flagService := fflag.NewService(flagRepo)
+	mux := api.New(db, flagService)
+
+	log.Info().Msgf("starting webserver on address %s", serverAddress)
+	err = http.ListenAndServe(serverAddress, mux.NewRouter())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to start webserver")
+	}
 }
 
-func getEnvOrPanic(envName string) string {
+func getEnv(envName string) string {
 	envValue, exists := os.LookupEnv(envName)
 	if exists == false {
-		panic(fmt.Errorf("environment variable '%s' does not exist", envName))
+		log.Fatal().Msgf("environment variable '%s' does not exist")
 	}
 	return envValue
 }
 
 func mkPGOptions() pg.ConnOptions {
-	host := getEnvOrPanic("DB_HOST")
-	portEnv := getEnvOrPanic("DB_PORT")
+	host := getEnv("DB_HOST")
+	portEnv := getEnv("DB_PORT")
 	port, err := strconv.Atoi(portEnv)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("unable to convert port to integer")
 	}
-	user := getEnvOrPanic("DB_USER")
-	password := getEnvOrPanic("DB_PASSWORD")
-	dbName := getEnvOrPanic("DB_NAME")
+	user := getEnv("DB_USER")
+	password := getEnv("DB_PASSWORD")
+	dbName := getEnv("DB_NAME")
 
 	return pg.ConnOptions{
 		DBName:   dbName,
