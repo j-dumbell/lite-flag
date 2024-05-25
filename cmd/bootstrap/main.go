@@ -26,10 +26,7 @@ func main() {
 	authService := auth.NewService(keyRepo)
 
 	log.Info().Msg("creating root user")
-	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
-		Name: "root",
-		Role: auth.RoleRoot,
-	})
+	apiKey, err := authService.CreateRootKey()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create root user")
 	}

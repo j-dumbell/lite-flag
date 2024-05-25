@@ -18,11 +18,6 @@ func NewService(repo KeyRepo) Service {
 	}
 }
 
-type CreateApiKeyParams struct {
-	Name string `json:"name"`
-	Role Role   `json:"role"`
-}
-
 func newKey() string {
 	b := make([]byte, 40)
 	rand.Read(b)
@@ -31,7 +26,34 @@ func newKey() string {
 
 var ErrAlreadyExists = errors.New("an API key with that name already exists")
 
+func (service *Service) CreateRootKey() (ApiKey, error) {
+	createParams := CreateKeyParams{
+		Name: "root",
+		Key:  newKey(),
+		Role: RoleRoot,
+	}
+	apiKey, err := service.repo.Create(createParams)
+	if err == pg.ErrAlreadyExists {
+		return ApiKey{}, ErrAlreadyExists
+	} else if err != nil {
+		return ApiKey{}, err
+	}
+
+	return apiKey, nil
+}
+
+type CreateApiKeyParams struct {
+	Name string `json:"name"`
+	Role Role   `json:"role"`
+}
+
+var ErrInvalidRole = errors.New("cannot create API key with 'root' role")
+
 func (service *Service) CreateKey(params CreateApiKeyParams) (ApiKey, error) {
+	if params.Role == RoleRoot {
+		return ApiKey{}, ErrInvalidRole
+	}
+
 	createParams := CreateKeyParams{
 		Name: params.Name,
 		Key:  newKey(),

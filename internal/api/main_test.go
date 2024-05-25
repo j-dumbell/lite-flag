@@ -94,10 +94,7 @@ func resetDB(t *testing.T) {
 }
 
 func createRootKey(t *testing.T) auth.ApiKey {
-	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
-		Name: "root-test",
-		Role: auth.RoleRoot,
-	})
+	apiKey, err := authService.CreateRootKey()
 	require.NoError(t, err, "failed to create root key")
 	return apiKey
 }
