@@ -10,6 +10,7 @@ import (
 	"github.com/j-dumbell/lite-flag/internal/fflag"
 	"github.com/j-dumbell/lite-flag/pkg/chix"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
+	"github.com/j-dumbell/lite-flag/pkg/validation"
 )
 
 func (api *API) PostFlag(r *http.Request) chix.Response {
@@ -21,7 +22,7 @@ func (api *API) PostFlag(r *http.Request) chix.Response {
 	flag, err := api.flagService.Create(body)
 	if errors.Is(err, pg.ErrAlreadyExists) {
 		return chix.Conflict("a flag with that name already exists")
-	} else if errors.As(err, &fflag.ValidationError{}) {
+	} else if errors.As(err, &validation.ValidationError{}) {
 		return chix.BadRequest(err)
 	}
 

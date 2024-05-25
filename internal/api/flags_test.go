@@ -8,15 +8,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/j-dumbell/lite-flag/internal/bootstrap"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetFlags(t *testing.T) {
-	err := bootstrap.Truncate(testDB)
-	require.NoError(t, err, "failed to refresh DB")
+	resetDB(t)
+	key := createAdminKey(t)
 
 	savedFlag1 := fflag.UpsertFlagParams{
 		Name:    "abc",
@@ -33,6 +32,7 @@ func TestGetFlags(t *testing.T) {
 	require.NoError(t, err, "could not setup test data")
 
 	req := httptest.NewRequest(http.MethodGet, "/flags", nil)
+	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -53,8 +53,7 @@ func TestGetFlags(t *testing.T) {
 }
 
 func TestGetFlag(t *testing.T) {
-	err := bootstrap.Truncate(testDB)
-	require.NoError(t, err, "failed to refresh DB")
+	resetDB(t)
 
 	savedFlag, err := flagService.Create(fflag.UpsertFlagParams{
 		Name:    "blah",
@@ -80,8 +79,8 @@ func TestGetFlag(t *testing.T) {
 }
 
 func TestPostFlag(t *testing.T) {
-	err := bootstrap.Truncate(testDB)
-	require.NoError(t, err, "failed to refresh DB")
+	resetDB(t)
+	key := createAdminKey(t)
 
 	reqBody := fflag.UpsertFlagParams{
 		Name:    "my-flag",
@@ -91,6 +90,7 @@ func TestPostFlag(t *testing.T) {
 	require.NoError(t, err, "could not marshal request body")
 
 	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader(jsonReqBody))
+	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -107,8 +107,8 @@ func TestPostFlag(t *testing.T) {
 }
 
 func TestDeleteFlag(t *testing.T) {
-	err := bootstrap.Truncate(testDB)
-	require.NoError(t, err, "failed to refresh DB")
+	resetDB(t)
+	key := createAdminKey(t)
 
 	flag, err := flagService.Create(fflag.UpsertFlagParams{
 		Name:    "fooBar",
@@ -117,6 +117,7 @@ func TestDeleteFlag(t *testing.T) {
 	require.NoError(t, err, "could not save test data to DB")
 
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/flags/%d", flag.ID), nil)
+	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 

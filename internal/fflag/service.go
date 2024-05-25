@@ -1,34 +1,11 @@
 package fflag
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/j-dumbell/lite-flag/pkg/pg"
+	"github.com/j-dumbell/lite-flag/pkg/validation"
 )
-
-type ValidationError struct {
-	FieldErrors map[string]string `json:"errors"`
-}
-
-func (validationError ValidationError) Error() string {
-	jsonError, err := json.Marshal(validationError.FieldErrors)
-	if err != nil {
-		return ""
-	}
-
-	return string(jsonError)
-}
-
-func (validationError *ValidationError) AddFieldError(field string, error string) {
-	validationError.FieldErrors[field] = error
-}
-
-func NewValidationError() ValidationError {
-	return ValidationError{
-		FieldErrors: map[string]string{},
-	}
-}
 
 type UpsertFlagParams struct {
 	Name    string `json:"name"`
@@ -37,7 +14,7 @@ type UpsertFlagParams struct {
 
 func (body *UpsertFlagParams) Validate() error {
 	if strings.ContainsRune(body.Name, ' ') || strings.ContainsRune(body.Name, '/') {
-		validationError := NewValidationError()
+		validationError := validation.NewValidationError()
 		validationError.AddFieldError("name", "name can only contain letters, numbers, hyphens or underscores")
 		return &validationError
 	}

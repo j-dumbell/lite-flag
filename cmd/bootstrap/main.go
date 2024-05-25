@@ -1,19 +1,14 @@
 package main
 
 import (
-	"net/http"
 	"os"
 	"strconv"
 
-	"github.com/j-dumbell/lite-flag/internal/api"
 	"github.com/j-dumbell/lite-flag/internal/auth"
-	"github.com/j-dumbell/lite-flag/internal/fflag"
+	"github.com/j-dumbell/lite-flag/internal/bootstrap"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
-	_ "github.com/lib/pq"
 	"github.com/rs/zerolog/log"
 )
-
-const serverAddress = ":8080"
 
 func main() {
 	db, err := pg.Connect(mkPGOptions())
@@ -22,17 +17,24 @@ func main() {
 	}
 	defer db.Close()
 
-	flagRepo := fflag.NewRepo(db)
-	flagService := fflag.NewService(flagRepo)
+	log.Info().Msg("creating tables")
+	if err := bootstrap.Recreate(db); err != nil {
+		log.Fatal().Err(err).Msg("failed to create DB tables")
+	}
+
 	keyRepo := auth.NewKeyRepo(db)
 	authService := auth.NewService(keyRepo)
-	mux := api.New(db, flagService, authService)
 
-	log.Info().Msgf("starting webserver on address %s", serverAddress)
-	err = http.ListenAndServe(serverAddress, mux.NewRouter())
+	log.Info().Msg("creating root user")
+	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+		Name: "root",
+		Role: auth.RoleRoot,
+	})
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to start webserver")
+		log.Fatal().Err(err).Msg("failed to create root user")
 	}
+
+	log.Info().Str("API key", apiKey.Key).Msg("successfully created root user")
 }
 
 func getEnv(envName string) string {

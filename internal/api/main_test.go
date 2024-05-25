@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/j-dumbell/lite-flag/internal/auth"
 	"github.com/j-dumbell/lite-flag/internal/bootstrap"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -19,6 +21,7 @@ import (
 var testDB *sql.DB
 var testApi API
 var flagService fflag.Service
+var authService auth.Service
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
@@ -76,8 +79,43 @@ func TestMain(m *testing.M) {
 
 	flagRepo := fflag.NewRepo(testDB)
 	flagService = fflag.NewService(flagRepo)
-	testApi = New(testDB, flagService)
+
+	keyRepo := auth.NewKeyRepo(testDB)
+	authService = auth.NewService(keyRepo)
+	testApi = New(testDB, flagService, authService)
 
 	code := m.Run()
 	os.Exit(code)
+}
+
+func resetDB(t *testing.T) {
+	err := bootstrap.Truncate(testDB)
+	require.NoError(t, err, "failed to reset DB")
+}
+
+func createRootKey(t *testing.T) auth.ApiKey {
+	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+		Name: "root-test",
+		Role: auth.RoleRoot,
+	})
+	require.NoError(t, err, "failed to create root key")
+	return apiKey
+}
+
+func createAdminKey(t *testing.T) auth.ApiKey {
+	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+		Name: "admin-test",
+		Role: auth.RoleAdmin,
+	})
+	require.NoError(t, err, "failed to create admin key")
+	return apiKey
+}
+
+func createReadonlyKey(t *testing.T) auth.ApiKey {
+	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+		Name: "readonly-test",
+		Role: auth.RoleReadonly,
+	})
+	require.NoError(t, err, "failed to create readonly key")
+	return apiKey
 }

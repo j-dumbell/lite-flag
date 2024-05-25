@@ -35,22 +35,22 @@ func writeResponse(handler Handler) http.HandlerFunc {
 	}
 }
 
-func RegisterGet(router *chi.Mux, pattern string, handler Handler) {
-	router.Get(pattern, writeResponse(handler))
+func Get(router *chi.Mux, pattern string, handler Handler, middlewares ...func(http.Handler) http.Handler) {
+	router.With(middlewares...).Get(pattern, writeResponse(handler))
 }
 
-func RegisterPost(router *chi.Mux, pattern string, handler Handler) {
-	router.Post(pattern, writeResponse(handler))
+func Post(router *chi.Mux, pattern string, handler Handler, middlewares ...func(http.Handler) http.Handler) {
+	router.With(middlewares...).Post(pattern, writeResponse(handler))
 }
 
-func RegisterPut(router *chi.Mux, pattern string, handler Handler) {
-	router.Put(pattern, writeResponse(handler))
+func Put(router *chi.Mux, pattern string, handler Handler, middlewares ...func(http.Handler) http.Handler) {
+	router.With(middlewares...).Put(pattern, writeResponse(handler))
 }
 
-func RegisterPatch(router *chi.Mux, pattern string, handler Handler) {
-	router.Patch(pattern, writeResponse(handler))
+func Patch(router *chi.Mux, pattern string, handler Handler, middlewares ...func(http.Handler) http.Handler) {
+	router.With(middlewares...).Patch(pattern, writeResponse(handler))
 }
 
-func RegisterDelete(router *chi.Mux, pattern string, handler Handler) {
-	router.Delete(pattern, writeResponse(handler))
+func Delete(router *chi.Mux, pattern string, handler Handler, middlewares ...func(http.Handler) http.Handler) {
+	router.With(middlewares...).Delete(pattern, writeResponse(handler))
 }
