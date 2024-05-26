@@ -1,7 +1,7 @@
 package fflag
 
 import (
-	"strings"
+	"errors"
 
 	"github.com/j-dumbell/lite-flag/pkg/pg"
 	"github.com/j-dumbell/lite-flag/pkg/validation"
@@ -12,14 +12,13 @@ type UpsertFlagParams struct {
 	Enabled bool   `json:"enabled"`
 }
 
-func (body *UpsertFlagParams) Validate() error {
-	if strings.ContainsRune(body.Name, ' ') || strings.ContainsRune(body.Name, '/') {
-		validationError := validation.NewValidationError()
-		validationError.AddFieldError("name", "name can only contain letters, numbers, hyphens or underscores")
-		return &validationError
+func (upsertFlagParams *UpsertFlagParams) Validate() error {
+	result := validation.Result{}
+	if upsertFlagParams.Name == "" {
+		result.AddFieldError("name", validation.IsRequiredMsg)
 	}
 
-	return nil
+	return result.ToError()
 }
 
 type Service struct {
@@ -36,11 +35,10 @@ func (service *Service) Create(params UpsertFlagParams) (Flag, error) {
 	if err := params.Validate(); err != nil {
 		return Flag{}, err
 	}
-
 	return service.repo.Create(params)
 }
 
-func (service *Service) FindOne(id uint32) (Flag, error) {
+func (service *Service) FindOne(id int) (Flag, error) {
 	return service.repo.FindOne(id)
 }
 
@@ -48,22 +46,35 @@ func (service *Service) FindAll() ([]Flag, error) {
 	return service.repo.FindAll()
 }
 
-func (service *Service) Delete(id uint32) error {
-	return service.repo.Delete(id)
+var ErrNotFound = errors.New("no flag found with that id")
+
+func (service *Service) Delete(id int) error {
+	err := service.repo.Delete(id)
+	if err == pg.ErrNoRows {
+		return ErrNotFound
+	} else if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (service *Service) Update(flag Flag) (Flag, error) {
-	upsertParams := UpsertFlagParams{
-		Name:    flag.Name,
-		Enabled: flag.Enabled,
-	}
+func (service *Service) Update(id int, upsertParams UpsertFlagParams) (Flag, error) {
 	if err := upsertParams.Validate(); err != nil {
 		return Flag{}, err
 	}
 
-	_, err := service.repo.FindOne(flag.ID)
-	if err != nil {
-		return Flag{}, pg.ParseError(err)
+	_, err := service.repo.FindOne(id)
+	if err == pg.ErrNoRows {
+		return Flag{}, ErrNotFound
+	} else if err != nil {
+		return Flag{}, err
+	}
+
+	flag := Flag{
+		ID:      id,
+		Name:    upsertParams.Name,
+		Enabled: upsertParams.Enabled,
 	}
 
 	return service.repo.Update(flag)

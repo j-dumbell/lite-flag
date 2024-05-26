@@ -106,6 +106,45 @@ func TestPostFlag(t *testing.T) {
 	assert.Equal(t, actualBody.Enabled, reqBody.Enabled, "Enabled")
 }
 
+func TestPostFlag_alreadyExists(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	flagName := "some-flag"
+	_, err := flagService.Create(fflag.UpsertFlagParams{
+		Name:    flagName,
+		Enabled: false,
+	})
+
+	reqBody := fflag.UpsertFlagParams{
+		Name:    flagName,
+		Enabled: true,
+	}
+	jsonReqBody, err := json.Marshal(reqBody)
+	require.NoError(t, err, "could not marshal request body")
+
+	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader(jsonReqBody))
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusConflict, result.StatusCode, "status code")
+}
+
+func TestPostFlag_invalidBody(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader([]byte(`{enabled: false}`)))
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusBadRequest, result.StatusCode, "status code")
+}
+
 func TestDeleteFlag(t *testing.T) {
 	resetDB(t)
 	key := createAdminKey(t)
@@ -123,4 +162,17 @@ func TestDeleteFlag(t *testing.T) {
 
 	result := w.Result()
 	assert.Equal(t, http.StatusOK, result.StatusCode)
+}
+
+func TestDeleteFlag_notFound(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	req := httptest.NewRequest(http.MethodDelete, "/flags/100", nil)
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusNotFound, result.StatusCode)
 }

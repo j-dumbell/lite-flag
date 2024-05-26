@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"slices"
 
@@ -12,7 +11,6 @@ func authMW(permittedRoles ...auth.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			role := getRole(r.Context())
-			fmt.Println("authMW role", role)
 			if role == "" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return

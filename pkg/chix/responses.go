@@ -4,12 +4,12 @@ import (
 	"net/http"
 )
 
-type Message struct {
+type MessageResponse struct {
 	Message string `json:"message"`
 }
 
-func NewMessage(message string) Message {
-	return Message{message}
+type ErrorResponse struct {
+	Error any `json:"error"`
 }
 
 type Response struct {

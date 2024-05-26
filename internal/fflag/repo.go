@@ -24,7 +24,7 @@ func (repo *Repo) Create(params UpsertFlagParams) (Flag, error) {
 	}
 
 	flag := Flag{
-		ID:      uint32(id),
+		ID:      id,
 		Name:    params.Name,
 		Enabled: params.Enabled,
 	}
@@ -72,7 +72,7 @@ func (repo *Repo) FindAll() ([]Flag, error) {
 	return parseQueryResult(rows)
 }
 
-func (repo *Repo) FindOne(id uint32) (Flag, error) {
+func (repo *Repo) FindOne(id int) (Flag, error) {
 	rows, err := repo.db.Query("SELECT id, name, enabled FROM flags WHERE id = $1;", id)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
@@ -83,12 +83,17 @@ func (repo *Repo) FindOne(id uint32) (Flag, error) {
 		return Flag{}, err
 	}
 	if len(flags) == 0 {
-		return Flag{}, sql.ErrNoRows
+		return Flag{}, pg.ErrNoRows
 	}
 	return flags[0], nil
 }
 
-func (repo *Repo) Delete(id uint32) error {
-	_, err := repo.db.Query("DELETE FROM flags WHERE id = $1;", id)
+func (repo *Repo) Delete(id int) error {
+	_, err := repo.FindOne(id)
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.db.Query("DELETE FROM flags WHERE id = $1;", id)
 	return pg.ParseError(err)
 }

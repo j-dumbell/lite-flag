@@ -18,18 +18,21 @@ func writeResponse(handler Handler) http.HandlerFunc {
 			return
 		}
 
-		body := response.Body
-		message, isString := body.(string)
-		if isString {
-			body = NewMessage(message)
+		var toMarshal any
+		switch t := response.Body.(type) {
+		case string:
+			toMarshal = MessageResponse{t}
+		default:
+			toMarshal = t
 		}
 
-		jsonBody, err := json.Marshal(body)
+		jsonBody, err := json.Marshal(toMarshal)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
+		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(response.StatusCode)
 		w.Write(jsonBody)
 	}

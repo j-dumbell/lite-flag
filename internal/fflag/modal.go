@@ -2,7 +2,7 @@ package fflag
 
 // ToDo how to handle schedules?
 type Flag struct {
-	ID      uint32 `json:"id"`
+	ID      int    `json:"id"`
 	Name    string `json:"name"`
 	Enabled bool   `json:"enabled"`
 }
