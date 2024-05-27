@@ -9,16 +9,16 @@ import (
 
 type ctxKey int
 
-const ctxKeyRole ctxKey = 0
+const ctxKeyUser ctxKey = 0
 const apiKeyHeader = "X-Api-Key"
 
-func getRole(ctx context.Context) auth.Role {
-	roleValue := ctx.Value(ctxKeyRole)
-	role, ok := roleValue.(auth.Role)
+func getUser(ctx context.Context) (auth.ApiKeyRedacted, bool) {
+	roleValue := ctx.Value(ctxKeyUser)
+	apiKeyRedacted, ok := roleValue.(auth.ApiKeyRedacted)
 	if !ok {
-		return ""
+		return auth.ApiKeyRedacted{}, false
 	}
-	return role
+	return apiKeyRedacted, true
 }
 
 // newRoleMW is a middleware which reads the API key provided in the headers
@@ -32,13 +32,13 @@ func newRoleMW(authService auth.Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			role, err := authService.KeyRole(apiKey)
+			apiKeyRedacted, err := authService.FindOneByKey(apiKey)
 			if err != nil {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), ctxKeyRole, role)
+			ctx := context.WithValue(r.Context(), ctxKeyUser, apiKeyRedacted)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 

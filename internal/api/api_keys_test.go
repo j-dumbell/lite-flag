@@ -1,0 +1,97 @@
+package api
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/j-dumbell/lite-flag/internal/auth"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestPostKey(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	reqBody := auth.CreateApiKeyParams{
+		Name: "some-key",
+		Role: auth.RoleReadonly,
+	}
+	jsonReqBody, err := json.Marshal(reqBody)
+	require.NoError(t, err, "could not marshal request reqBody")
+
+	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(jsonReqBody))
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	resultBody := result.Body
+	defer resultBody.Close()
+	var actualBody auth.ApiKey
+	err = json.NewDecoder(resultBody).Decode(&actualBody)
+	require.NoError(t, err, "could not decode response reqBody")
+
+	assert.Equal(t, http.StatusCreated, result.StatusCode, "status code")
+	assert.Equal(t, actualBody.Name, reqBody.Name, "Name")
+	assert.Equal(t, actualBody.Role, reqBody.Role, "Role")
+	assert.GreaterOrEqual(t, len(actualBody.Key), 40, "Key length")
+}
+
+func TestDeleteKey(t *testing.T) {
+	resetDB(t)
+	requestorKey := createAdminKey(t)
+
+	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+		Name: "blah",
+		Role: auth.RoleReadonly,
+	})
+	require.NoError(t, err, "failed to insert test key")
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%d", apiKey.ID), nil)
+	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+
+	assert.Equal(t, http.StatusOK, result.StatusCode, "status code")
+}
+
+func TestDeleteKey_adminDeletingAdmin(t *testing.T) {
+	resetDB(t)
+	requestorKey := createAdminKey(t)
+
+	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+		Name: "blah",
+		Role: auth.RoleAdmin,
+	})
+	require.NoError(t, err, "failed to insert test key")
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%d", apiKey.ID), nil)
+	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+
+	assert.Equal(t, http.StatusForbidden, result.StatusCode, "status code")
+}
+
+func TestDeleteKey_root(t *testing.T) {
+	resetDB(t)
+	requestorKey := createAdminKey(t)
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%d", requestorKey.ID), nil)
+	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+
+	assert.Equal(t, http.StatusForbidden, result.StatusCode, "status code")
+}

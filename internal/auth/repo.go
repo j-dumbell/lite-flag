@@ -36,6 +36,22 @@ func (repo *KeyRepo) Create(params CreateKeyParams) (ApiKey, error) {
 	return ApiKey{ID: id, Name: params.Name, Key: params.Key, Role: params.Role}, nil
 }
 
+func (repo *KeyRepo) Update(apiKey ApiKey) error {
+	_, err := repo.db.Exec(`
+			UPDATE api_keys
+			SET 
+			    name = $2,
+			    key = crypt($3, gen_salt('bf')),
+			    role = $4
+			WHERE id = $1;`,
+		apiKey.ID, apiKey.Name, apiKey.Key, apiKey.Role)
+	if err != nil {
+		return pg.ParseError(err)
+	}
+
+	return nil
+}
+
 func (repo *KeyRepo) parseRows(rows *sql.Rows) ([]ApiKeyRedacted, error) {
 	var apiKeys []ApiKeyRedacted
 	for rows.Next() {
@@ -66,11 +82,30 @@ func (repo *KeyRepo) FindAll() ([]ApiKeyRedacted, error) {
 
 func (repo *KeyRepo) DeleteByID(id int) error {
 	_, err := repo.db.Exec("DELETE FROM api_keys WHERE id = $1;", id)
-	return err
+	return pg.ParseError(err)
 }
 
 func (repo *KeyRepo) FindOneByKey(key string) (ApiKeyRedacted, error) {
 	rows, err := repo.db.Query("SELECT id, name, role FROM api_keys WHERE key = crypt($1, key)", key)
+	if err != nil {
+		return ApiKeyRedacted{}, err
+	}
+	defer rows.Close()
+
+	apiKeys, err := repo.parseRows(rows)
+	if err != nil {
+		return ApiKeyRedacted{}, err
+	}
+
+	if len(apiKeys) == 0 {
+		return ApiKeyRedacted{}, pg.ErrNoRows
+	}
+
+	return apiKeys[0], nil
+}
+
+func (repo *KeyRepo) FindOneByID(id int) (ApiKeyRedacted, error) {
+	rows, err := repo.db.Query("SELECT id, name, role FROM api_keys WHERE id = $1", id)
 	if err != nil {
 		return ApiKeyRedacted{}, err
 	}

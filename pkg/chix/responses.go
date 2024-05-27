@@ -72,3 +72,10 @@ func Created(body any) Response {
 		Body:       body,
 	}
 }
+
+func Forbidden(body any) Response {
+	return Response{
+		StatusCode: http.StatusForbidden,
+		Body:       body,
+	}
+}
