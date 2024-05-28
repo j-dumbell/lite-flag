@@ -11,7 +11,7 @@ type healthResponse struct {
 }
 
 func (api *API) Healthcheck(r *http.Request) chix.Response {
-	err := api.db.Ping()
+	err := api.db.PingContext(r.Context())
 	if err != nil {
 		response := healthResponse{Database: false}
 		return chix.NotFound(response)

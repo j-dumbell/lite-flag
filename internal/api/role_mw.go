@@ -32,7 +32,7 @@ func newRoleMW(authService auth.Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			apiKeyRedacted, err := authService.FindOneByKey(apiKey)
+			apiKeyRedacted, err := authService.FindOneByKey(r.Context(), apiKey)
 			if err != nil {
 				next.ServeHTTP(w, r)
 				return

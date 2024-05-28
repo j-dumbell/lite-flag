@@ -1,6 +1,7 @@
 package fflag
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/j-dumbell/lite-flag/pkg/pg"
@@ -16,9 +17,9 @@ func NewRepo(db *sql.DB) Repo {
 	}
 }
 
-func (repo *Repo) Create(params UpsertFlagParams) (Flag, error) {
+func (repo *Repo) Create(ctx context.Context, params UpsertFlagParams) (Flag, error) {
 	var id int
-	err := repo.db.QueryRow("INSERT INTO flags (name, enabled) VALUES ($1, $2) RETURNING id", params.Name, params.Enabled).Scan(&id)
+	err := repo.db.QueryRowContext(ctx, "INSERT INTO flags (name, enabled) VALUES ($1, $2) RETURNING id", params.Name, params.Enabled).Scan(&id)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}
@@ -31,8 +32,8 @@ func (repo *Repo) Create(params UpsertFlagParams) (Flag, error) {
 	return flag, nil
 }
 
-func (repo *Repo) Update(flag Flag) (Flag, error) {
-	_, err := repo.db.Exec("UPDATE flags SET name = $1, enabled = $2 WHERE id = $3", flag.Name, flag.Enabled, flag.ID)
+func (repo *Repo) Update(ctx context.Context, flag Flag) (Flag, error) {
+	_, err := repo.db.ExecContext(ctx, "UPDATE flags SET name = $1, enabled = $2 WHERE id = $3", flag.Name, flag.Enabled, flag.ID)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}
@@ -46,10 +47,10 @@ func (repo *Repo) Update(flag Flag) (Flag, error) {
 	return updatedFlag, nil
 }
 
-func parseQueryResult(rows *sql.Rows) ([]Flag, error) {
+func parseRows(rows *sql.Rows) ([]Flag, error) {
 	defer rows.Close()
 
-	var flags []Flag
+	flags := []Flag{}
 	for rows.Next() {
 		var flag Flag
 
@@ -63,22 +64,22 @@ func parseQueryResult(rows *sql.Rows) ([]Flag, error) {
 	return flags, nil
 }
 
-func (repo *Repo) FindAll() ([]Flag, error) {
-	rows, err := repo.db.Query("SELECT id, name, enabled FROM flags;")
+func (repo *Repo) FindAll(ctx context.Context) ([]Flag, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT id, name, enabled FROM flags;")
 	if err != nil {
 		return nil, pg.ParseError(err)
 	}
 
-	return parseQueryResult(rows)
+	return parseRows(rows)
 }
 
-func (repo *Repo) FindOne(id int) (Flag, error) {
-	rows, err := repo.db.Query("SELECT id, name, enabled FROM flags WHERE id = $1;", id)
+func (repo *Repo) FindOne(ctx context.Context, id int) (Flag, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT id, name, enabled FROM flags WHERE id = $1;", id)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}
 
-	flags, err := parseQueryResult(rows)
+	flags, err := parseRows(rows)
 	if err != nil {
 		return Flag{}, err
 	}
@@ -88,12 +89,12 @@ func (repo *Repo) FindOne(id int) (Flag, error) {
 	return flags[0], nil
 }
 
-func (repo *Repo) Delete(id int) error {
-	_, err := repo.FindOne(id)
+func (repo *Repo) Delete(ctx context.Context, id int) error {
+	_, err := repo.FindOne(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.db.Query("DELETE FROM flags WHERE id = $1;", id)
+	_, err = repo.db.QueryContext(ctx, "DELETE FROM flags WHERE id = $1;", id)
 	return pg.ParseError(err)
 }

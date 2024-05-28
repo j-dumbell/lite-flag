@@ -1,6 +1,7 @@
 package fflag
 
 import (
+	"context"
 	"errors"
 
 	"github.com/j-dumbell/lite-flag/pkg/pg"
@@ -31,25 +32,40 @@ func NewService(repo Repo) Service {
 	}
 }
 
-func (service *Service) Create(params UpsertFlagParams) (Flag, error) {
+func (service *Service) Create(ctx context.Context, params UpsertFlagParams) (Flag, error) {
 	if err := params.Validate(); err != nil {
 		return Flag{}, err
 	}
-	return service.repo.Create(params)
+
+	flag, err := service.repo.Create(ctx, params)
+	if errors.Is(err, pg.ErrAlreadyExists) {
+		return Flag{}, err
+	} else if err != nil {
+		return Flag{}, err
+	}
+
+	return flag, nil
 }
 
-func (service *Service) FindOne(id int) (Flag, error) {
-	return service.repo.FindOne(id)
+func (service *Service) FindOne(ctx context.Context, id int) (Flag, error) {
+	flag, err := service.repo.FindOne(ctx, id)
+	if err == pg.ErrNoRows {
+		return Flag{}, ErrNotFound
+	} else if err != nil {
+		return Flag{}, err
+	}
+
+	return flag, nil
 }
 
-func (service *Service) FindAll() ([]Flag, error) {
-	return service.repo.FindAll()
+func (service *Service) FindAll(ctx context.Context) ([]Flag, error) {
+	return service.repo.FindAll(ctx)
 }
 
-var ErrNotFound = errors.New("no flag found with that id")
+var ErrNotFound = errors.New("no flag found")
 
-func (service *Service) Delete(id int) error {
-	err := service.repo.Delete(id)
+func (service *Service) Delete(ctx context.Context, id int) error {
+	err := service.repo.Delete(ctx, id)
 	if err == pg.ErrNoRows {
 		return ErrNotFound
 	} else if err != nil {
@@ -59,12 +75,12 @@ func (service *Service) Delete(id int) error {
 	return nil
 }
 
-func (service *Service) Update(id int, upsertParams UpsertFlagParams) (Flag, error) {
+func (service *Service) Update(ctx context.Context, id int, upsertParams UpsertFlagParams) (Flag, error) {
 	if err := upsertParams.Validate(); err != nil {
 		return Flag{}, err
 	}
 
-	_, err := service.repo.FindOne(id)
+	_, err := service.repo.FindOne(ctx, id)
 	if err == pg.ErrNoRows {
 		return Flag{}, ErrNotFound
 	} else if err != nil {
@@ -77,5 +93,5 @@ func (service *Service) Update(id int, upsertParams UpsertFlagParams) (Flag, err
 		Enabled: upsertParams.Enabled,
 	}
 
-	return service.repo.Update(flag)
+	return service.repo.Update(ctx, flag)
 }

@@ -1,6 +1,9 @@
 package bootstrap
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
 var ddls = []string{
 	"CREATE EXTENSION IF NOT EXISTS pgcrypto;",
@@ -29,9 +32,9 @@ var truncateStatements = []string{
 	"TRUNCATE TABLE api_keys;",
 }
 
-func executeMany(db *sql.DB, statements []string) error {
+func executeMany(ctx context.Context, db *sql.DB, statements []string) error {
 	for _, statement := range statements {
-		_, err := db.Exec(statement)
+		_, err := db.ExecContext(ctx, statement)
 		if err != nil {
 			return err
 		}
@@ -39,10 +42,10 @@ func executeMany(db *sql.DB, statements []string) error {
 	return nil
 }
 
-func Recreate(db *sql.DB) error {
-	return executeMany(db, ddls)
+func Recreate(ctx context.Context, db *sql.DB) error {
+	return executeMany(ctx, db, ddls)
 }
 
-func Truncate(db *sql.DB) error {
-	return executeMany(db, truncateStatements)
+func Truncate(ctx context.Context, db *sql.DB) error {
+	return executeMany(ctx, db, truncateStatements)
 }

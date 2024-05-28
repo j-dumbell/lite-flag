@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -21,14 +22,14 @@ func TestGetFlags(t *testing.T) {
 		Name:    "abc",
 		Enabled: true,
 	}
-	flag1, err := flagService.Create(savedFlag1)
+	flag1, err := flagService.Create(context.Background(), savedFlag1)
 	require.NoError(t, err, "could not setup test data")
 
 	savedFlag2 := fflag.UpsertFlagParams{
 		Name:    "def",
 		Enabled: true,
 	}
-	flag2, err := flagService.Create(savedFlag2)
+	flag2, err := flagService.Create(context.Background(), savedFlag2)
 	require.NoError(t, err, "could not setup test data")
 
 	req := httptest.NewRequest(http.MethodGet, "/flags", nil)
@@ -55,7 +56,7 @@ func TestGetFlags(t *testing.T) {
 func TestGetFlag(t *testing.T) {
 	resetDB(t)
 
-	savedFlag, err := flagService.Create(fflag.UpsertFlagParams{
+	savedFlag, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
 		Name:    "blah",
 		Enabled: false,
 	})
@@ -111,7 +112,7 @@ func TestPostFlag_alreadyExists(t *testing.T) {
 	key := createAdminKey(t)
 
 	flagName := "some-flag"
-	_, err := flagService.Create(fflag.UpsertFlagParams{
+	_, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
 		Name:    flagName,
 		Enabled: false,
 	})
@@ -149,7 +150,7 @@ func TestDeleteFlag(t *testing.T) {
 	resetDB(t)
 	key := createAdminKey(t)
 
-	flag, err := flagService.Create(fflag.UpsertFlagParams{
+	flag, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
 		Name:    "fooBar",
 		Enabled: true,
 	})

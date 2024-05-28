@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -28,13 +29,13 @@ func newKey() string {
 
 var ErrAlreadyExists = errors.New("an API key with that name already exists")
 
-func (service *Service) CreateRootKey() (ApiKey, error) {
+func (service *Service) CreateRootKey(ctx context.Context) (ApiKey, error) {
 	createParams := CreateKeyParams{
 		Name: "root",
 		Key:  newKey(),
 		Role: RoleRoot,
 	}
-	apiKey, err := service.repo.Create(createParams)
+	apiKey, err := service.repo.Create(ctx, createParams)
 	if err == pg.ErrAlreadyExists {
 		return ApiKey{}, ErrAlreadyExists
 	} else if err != nil {
@@ -61,7 +62,7 @@ func (createApiKeyParams *CreateApiKeyParams) Validate() error {
 	return validationResult.ToError()
 }
 
-func (service *Service) CreateKey(params CreateApiKeyParams) (ApiKey, error) {
+func (service *Service) CreateKey(ctx context.Context, params CreateApiKeyParams) (ApiKey, error) {
 	if err := params.Validate(); err != nil {
 		return ApiKey{}, err
 	}
@@ -71,7 +72,7 @@ func (service *Service) CreateKey(params CreateApiKeyParams) (ApiKey, error) {
 		Key:  newKey(),
 		Role: params.Role,
 	}
-	apiKey, err := service.repo.Create(createParams)
+	apiKey, err := service.repo.Create(ctx, createParams)
 	if err == pg.ErrAlreadyExists {
 		return ApiKey{}, ErrAlreadyExists
 	} else if err != nil {
@@ -81,32 +82,10 @@ func (service *Service) CreateKey(params CreateApiKeyParams) (ApiKey, error) {
 	return apiKey, nil
 }
 
-func (service *Service) KeyExists(key string) (bool, error) {
-	_, err := service.repo.FindOneByKey(key)
-	if err == pg.ErrNoRows {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
 var ErrKeyNotFound = errors.New("api key not found")
 
-func (service *Service) KeyRole(key string) (Role, error) {
-	apiKey, err := service.repo.FindOneByKey(key)
-	if errors.Is(err, pg.ErrNoRows) {
-		return "", ErrKeyNotFound
-	} else if err != nil {
-		return "", err
-	}
-
-	return apiKey.Role, nil
-}
-
-func (service *Service) FindOneByKey(key string) (ApiKeyRedacted, error) {
-	apiKey, err := service.repo.FindOneByKey(key)
+func (service *Service) FindOneByKey(ctx context.Context, key string) (ApiKeyRedacted, error) {
+	apiKey, err := service.repo.FindOneByKey(ctx, key)
 	if errors.Is(err, pg.ErrNoRows) {
 		return ApiKeyRedacted{}, ErrKeyNotFound
 	} else if err != nil {
@@ -116,8 +95,8 @@ func (service *Service) FindOneByKey(key string) (ApiKeyRedacted, error) {
 	return apiKey, nil
 }
 
-func (service *Service) FindOneByID(id int) (ApiKeyRedacted, error) {
-	apiKey, err := service.repo.FindOneByID(id)
+func (service *Service) FindOneByID(ctx context.Context, id int) (ApiKeyRedacted, error) {
+	apiKey, err := service.repo.FindOneByID(ctx, id)
 	if err == pg.ErrNoRows {
 		return ApiKeyRedacted{}, ErrKeyNotFound
 	} else if err != nil {
@@ -129,8 +108,8 @@ func (service *Service) FindOneByID(id int) (ApiKeyRedacted, error) {
 
 var ErrCannotDeleteRoot = errors.New("root key cannot be deleted")
 
-func (service *Service) DeleteByID(id int) error {
-	apiKey, err := service.repo.FindOneByID(id)
+func (service *Service) DeleteByID(ctx context.Context, id int) error {
+	apiKey, err := service.repo.FindOneByID(ctx, id)
 	if err == pg.ErrNoRows {
 		return ErrKeyNotFound
 	} else if err != nil {
@@ -141,11 +120,11 @@ func (service *Service) DeleteByID(id int) error {
 		return ErrCannotDeleteRoot
 	}
 
-	return service.repo.DeleteByID(id)
+	return service.repo.DeleteByID(ctx, id)
 }
 
-func (service *Service) RotateKey(id int) (ApiKey, error) {
-	apiKeyRedacted, err := service.FindOneByID(id)
+func (service *Service) RotateKey(ctx context.Context, id int) (ApiKey, error) {
+	apiKeyRedacted, err := service.FindOneByID(ctx, id)
 	if err == pg.ErrNoRows {
 		return ApiKey{}, ErrKeyNotFound
 	} else if err != nil {
@@ -159,7 +138,7 @@ func (service *Service) RotateKey(id int) (ApiKey, error) {
 		Role: apiKeyRedacted.Role,
 	}
 
-	if err := service.repo.Update(newApiKey); err != nil {
+	if err := service.repo.Update(ctx, newApiKey); err != nil {
 		return ApiKey{}, err
 	}
 

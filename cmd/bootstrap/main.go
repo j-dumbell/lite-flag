@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"strconv"
 
@@ -17,8 +18,10 @@ func main() {
 	}
 	defer db.Close()
 
+	ctx := context.Background()
+
 	log.Info().Msg("creating tables")
-	if err := bootstrap.Recreate(db); err != nil {
+	if err := bootstrap.Recreate(ctx, db); err != nil {
 		log.Fatal().Err(err).Msg("failed to create DB tables")
 	}
 
@@ -26,7 +29,7 @@ func main() {
 	authService := auth.NewService(keyRepo)
 
 	log.Info().Msg("creating root user")
-	apiKey, err := authService.CreateRootKey()
+	apiKey, err := authService.CreateRootKey(ctx)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create root user")
 	}

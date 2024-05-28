@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/j-dumbell/lite-flag/pkg/pg"
@@ -20,10 +21,10 @@ type CreateKeyParams struct {
 	Role Role
 }
 
-func (repo *KeyRepo) Create(params CreateKeyParams) (ApiKey, error) {
+func (repo *KeyRepo) Create(ctx context.Context, params CreateKeyParams) (ApiKey, error) {
 	var id int
 	err := repo.db.
-		QueryRow(`
+		QueryRowContext(ctx, `
 			INSERT INTO api_keys (name, key, role) 
 				VALUES ($1, crypt($2, gen_salt('bf')), $3) 
 			RETURNING id`,
@@ -36,8 +37,8 @@ func (repo *KeyRepo) Create(params CreateKeyParams) (ApiKey, error) {
 	return ApiKey{ID: id, Name: params.Name, Key: params.Key, Role: params.Role}, nil
 }
 
-func (repo *KeyRepo) Update(apiKey ApiKey) error {
-	_, err := repo.db.Exec(`
+func (repo *KeyRepo) Update(ctx context.Context, apiKey ApiKey) error {
+	_, err := repo.db.ExecContext(ctx, `
 			UPDATE api_keys
 			SET 
 			    name = $2,
@@ -70,25 +71,25 @@ func (repo *KeyRepo) parseRows(rows *sql.Rows) ([]ApiKeyRedacted, error) {
 	return apiKeys, nil
 }
 
-func (repo *KeyRepo) FindAll() ([]ApiKeyRedacted, error) {
-	rows, err := repo.db.Query("SELECT id, name, role FROM api_keys;")
+func (repo *KeyRepo) FindAll(ctx context.Context) ([]ApiKeyRedacted, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT id, name, role FROM api_keys;")
 	if err != nil {
-		return nil, err
+		return nil, pg.ParseError(err)
 	}
 	defer rows.Close()
 
 	return repo.parseRows(rows)
 }
 
-func (repo *KeyRepo) DeleteByID(id int) error {
-	_, err := repo.db.Exec("DELETE FROM api_keys WHERE id = $1;", id)
+func (repo *KeyRepo) DeleteByID(ctx context.Context, id int) error {
+	_, err := repo.db.ExecContext(ctx, "DELETE FROM api_keys WHERE id = $1;", id)
 	return pg.ParseError(err)
 }
 
-func (repo *KeyRepo) FindOneByKey(key string) (ApiKeyRedacted, error) {
-	rows, err := repo.db.Query("SELECT id, name, role FROM api_keys WHERE key = crypt($1, key)", key)
+func (repo *KeyRepo) FindOneByKey(ctx context.Context, key string) (ApiKeyRedacted, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT id, name, role FROM api_keys WHERE key = crypt($1, key)", key)
 	if err != nil {
-		return ApiKeyRedacted{}, err
+		return ApiKeyRedacted{}, pg.ParseError(err)
 	}
 	defer rows.Close()
 
@@ -104,10 +105,10 @@ func (repo *KeyRepo) FindOneByKey(key string) (ApiKeyRedacted, error) {
 	return apiKeys[0], nil
 }
 
-func (repo *KeyRepo) FindOneByID(id int) (ApiKeyRedacted, error) {
-	rows, err := repo.db.Query("SELECT id, name, role FROM api_keys WHERE id = $1", id)
+func (repo *KeyRepo) FindOneByID(ctx context.Context, id int) (ApiKeyRedacted, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT id, name, role FROM api_keys WHERE id = $1", id)
 	if err != nil {
-		return ApiKeyRedacted{}, err
+		return ApiKeyRedacted{}, pg.ParseError(err)
 	}
 	defer rows.Close()
 

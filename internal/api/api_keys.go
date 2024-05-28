@@ -23,7 +23,7 @@ func (api *API) PostKey(r *http.Request) chix.Response {
 		return chix.Forbidden("admins may only create API keys with readonly role")
 	}
 
-	apiKey, err := api.authService.CreateKey(body)
+	apiKey, err := api.authService.CreateKey(r.Context(), body)
 	if errors.As(err, &validation.Result{}) {
 		return chix.BadRequest(err)
 	} else if errors.Is(err, auth.ErrAlreadyExists) {
@@ -42,7 +42,7 @@ func (api *API) DeleteKey(r *http.Request) chix.Response {
 		return chix.NotFound(nil)
 	}
 
-	apiKeyRedacted, err := api.authService.FindOneByID(id)
+	apiKeyRedacted, err := api.authService.FindOneByID(r.Context(), id)
 	if err == auth.ErrKeyNotFound {
 		return chix.NotFound(nil)
 	} else if err != nil {
@@ -57,7 +57,7 @@ func (api *API) DeleteKey(r *http.Request) chix.Response {
 		return chix.Forbidden("admins may only delete API keys with readonly role")
 	}
 
-	if err := api.authService.DeleteByID(id); err != nil {
+	if err := api.authService.DeleteByID(r.Context(), id); err != nil {
 		return chix.InternalServerError()
 	}
 
@@ -71,20 +71,19 @@ func (api *API) RotateKey(r *http.Request) chix.Response {
 		return chix.NotFound(nil)
 	}
 
-	apiKeyRedacted, err := api.authService.FindOneByID(id)
+	apiKeyRedacted, err := api.authService.FindOneByID(r.Context(), id)
 	if err == auth.ErrKeyNotFound {
 		return chix.NotFound(nil)
 	} else if err != nil {
 		return chix.InternalServerError()
 	}
 
-	// ToDo - Need requestor ID in context
 	user, _ := getUser(r.Context())
 	if user.Role == auth.RoleAdmin && apiKeyRedacted.ID != user.ID {
 		return chix.Forbidden("admins may only rotate their own keys")
 	}
 
-	newApiKey, err := api.authService.RotateKey(id)
+	newApiKey, err := api.authService.RotateKey(r.Context(), id)
 	if err != nil {
 		return chix.InternalServerError()
 	}

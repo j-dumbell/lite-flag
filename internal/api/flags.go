@@ -19,7 +19,7 @@ func (api *API) PostFlag(r *http.Request) chix.Response {
 		return chix.BadRequest("invalid JSON body")
 	}
 
-	flag, err := api.flagService.Create(body)
+	flag, err := api.flagService.Create(r.Context(), body)
 	if errors.As(err, &validation.Result{}) {
 		return chix.BadRequest(err)
 	} else if errors.Is(err, pg.ErrAlreadyExists) {
@@ -43,7 +43,7 @@ func (api *API) PutFlag(r *http.Request) chix.Response {
 		return chix.BadRequest("invalid JSON body")
 	}
 
-	flag, err := api.flagService.Update(id, body)
+	flag, err := api.flagService.Update(r.Context(), id, body)
 	if errors.As(err, &validation.Result{}) {
 		return chix.BadRequest(err)
 	} else if errors.Is(err, fflag.ErrNotFound) {
@@ -56,7 +56,7 @@ func (api *API) PutFlag(r *http.Request) chix.Response {
 }
 
 func (api *API) GetFlags(r *http.Request) chix.Response {
-	flags, err := api.flagService.FindAll()
+	flags, err := api.flagService.FindAll(r.Context())
 	if err != nil {
 		return chix.InternalServerError()
 	}
@@ -72,8 +72,8 @@ func (api *API) GetFlag(r *http.Request) chix.Response {
 		return chix.NotFound("a flag with that ID does not exist")
 	}
 
-	flag, err := api.flagService.FindOne(id)
-	if errors.Is(err, pg.ErrNoRows) {
+	flag, err := api.flagService.FindOne(r.Context(), id)
+	if errors.Is(err, fflag.ErrNotFound) {
 		return chix.NotFound("a flag with that ID does not exist")
 	} else if err != nil {
 		return chix.InternalServerError()
@@ -90,7 +90,7 @@ func (api *API) DeleteFlag(r *http.Request) chix.Response {
 		return chix.NotFound("a flag with that ID does not exist")
 	}
 
-	err = api.flagService.Delete(id)
+	err = api.flagService.Delete(r.Context(), id)
 	if err == fflag.ErrNotFound {
 		return chix.NotFound(nil)
 	} else if err != nil {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -46,7 +47,7 @@ func TestDeleteKey(t *testing.T) {
 	resetDB(t)
 	requestorKey := createAdminKey(t)
 
-	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
 		Name: "blah",
 		Role: auth.RoleReadonly,
 	})
@@ -66,7 +67,7 @@ func TestDeleteKey_adminDeletingAdmin(t *testing.T) {
 	resetDB(t)
 	requestorKey := createAdminKey(t)
 
-	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
 		Name: "blah",
 		Role: auth.RoleAdmin,
 	})
@@ -136,7 +137,7 @@ func TestRotateKey_adminRotatingAnothersKey(t *testing.T) {
 	resetDB(t)
 	requestorKey := createAdminKey(t)
 
-	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
 		Name: "blah",
 		Role: auth.RoleAdmin,
 	})

@@ -73,7 +73,7 @@ func TestMain(m *testing.M) {
 	}
 
 	testDB = db
-	if err := bootstrap.Recreate(testDB); err != nil {
+	if err := bootstrap.Recreate(context.Background(), testDB); err != nil {
 		log.Fatal().Err(err).Msg("failed to create DB schema")
 	}
 
@@ -89,18 +89,18 @@ func TestMain(m *testing.M) {
 }
 
 func resetDB(t *testing.T) {
-	err := bootstrap.Truncate(testDB)
+	err := bootstrap.Truncate(context.Background(), testDB)
 	require.NoError(t, err, "failed to reset DB")
 }
 
 func createRootKey(t *testing.T) auth.ApiKey {
-	apiKey, err := authService.CreateRootKey()
+	apiKey, err := authService.CreateRootKey(context.Background())
 	require.NoError(t, err, "failed to create root key")
 	return apiKey
 }
 
 func createAdminKey(t *testing.T) auth.ApiKey {
-	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
 		Name: "admin-test",
 		Role: auth.RoleAdmin,
 	})
@@ -109,7 +109,7 @@ func createAdminKey(t *testing.T) auth.ApiKey {
 }
 
 func createReadonlyKey(t *testing.T) auth.ApiKey {
-	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
 		Name: "readonly-test",
 		Role: auth.RoleReadonly,
 	})
