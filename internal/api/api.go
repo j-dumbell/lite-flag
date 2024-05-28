@@ -46,6 +46,7 @@ func (api *API) NewRouter() *chi.Mux {
 
 	chix.Post(r, "/api-keys", api.PostKey, adminOnly)
 	chix.Delete(r, "/api-keys/{id}", api.DeleteKey, adminOnly)
+	chix.Post(r, "/api-keys/{id}/rotate", api.RotateKey, adminOnly)
 
 	return r
 }

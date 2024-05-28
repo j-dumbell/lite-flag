@@ -95,3 +95,58 @@ func TestDeleteKey_root(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, result.StatusCode, "status code")
 }
+
+func TestRotateKey(t *testing.T) {
+	resetDB(t)
+	requestorKey := createAdminKey(t)
+
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%d/rotate", requestorKey.ID), nil)
+	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	resultBody := result.Body
+	defer resultBody.Close()
+	var actualBody auth.ApiKey
+	err := json.NewDecoder(resultBody).Decode(&actualBody)
+	require.NoError(t, err, "could not decode response response body")
+
+	assert.Equal(t, http.StatusOK, result.StatusCode, "status code")
+	assert.NotEqual(t, requestorKey.Key, actualBody.Key, "rotated key should not equal original key")
+	assert.Equal(t, requestorKey.Name, actualBody.Name, "Name")
+	assert.Equal(t, requestorKey.ID, actualBody.ID, "ID")
+	assert.Equal(t, requestorKey.Role, actualBody.Role, "Role")
+}
+
+func TestRotateKey_notFound(t *testing.T) {
+	resetDB(t)
+	requestorKey := createRootKey(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api-keys/1000/rotate", nil)
+	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusNotFound, result.StatusCode, "status code")
+}
+
+func TestRotateKey_adminRotatingAnothersKey(t *testing.T) {
+	resetDB(t)
+	requestorKey := createAdminKey(t)
+
+	apiKey, err := authService.CreateKey(auth.CreateApiKeyParams{
+		Name: "blah",
+		Role: auth.RoleAdmin,
+	})
+	require.NoError(t, err, "failed to insert test key")
+
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%d/rotate", apiKey.ID), nil)
+	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusForbidden, result.StatusCode, "status code")
+}

@@ -64,20 +64,30 @@ func (api *API) DeleteKey(r *http.Request) chix.Response {
 	return chix.OK(nil)
 }
 
-// func (api *API) RotateKey(r *http.Request) chix.Response {
-// 	idParam := chi.URLParam(r, "id")
-// 	id, err := strconv.Atoi(idParam)
-// 	if err != nil {
-// 		return chix.NotFound(nil)
-// 	}
-//
-// 	apiKeyRedacted, err := api.authService.FindOneByID(id)
-// 	if err == auth.ErrKeyNotFound {
-// 		return chix.NotFound(nil)
-// 	} else if err != nil {
-// 		return chix.InternalServerError()
-// 	}
-//
-// 	// ToDo - Need requestor ID in context
-// 	requestor := getUser(r.Context())
-// }
+func (api *API) RotateKey(r *http.Request) chix.Response {
+	idParam := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		return chix.NotFound(nil)
+	}
+
+	apiKeyRedacted, err := api.authService.FindOneByID(id)
+	if err == auth.ErrKeyNotFound {
+		return chix.NotFound(nil)
+	} else if err != nil {
+		return chix.InternalServerError()
+	}
+
+	// ToDo - Need requestor ID in context
+	user, _ := getUser(r.Context())
+	if user.Role == auth.RoleAdmin && apiKeyRedacted.ID != user.ID {
+		return chix.Forbidden("admins may only rotate their own keys")
+	}
+
+	newApiKey, err := api.authService.RotateKey(id)
+	if err != nil {
+		return chix.InternalServerError()
+	}
+
+	return chix.OK(newApiKey)
+}
