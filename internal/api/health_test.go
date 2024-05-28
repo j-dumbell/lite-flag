@@ -9,9 +9,9 @@ import (
 )
 
 func TestHealth(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	w := httptest.NewRecorder()
-	api.ServeHTTP(w, req)
+	testApi.NewRouter().ServeHTTP(w, req)
 
 	res := w.Result()
 	defer res.Body.Close()

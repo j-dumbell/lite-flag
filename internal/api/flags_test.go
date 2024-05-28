@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,121 +15,165 @@ import (
 )
 
 func TestGetFlags(t *testing.T) {
-	flagRepo := fflag.NewRepo(testDB)
+	resetDB(t)
+	key := createAdminKey(t)
 
-	savedFlag1 := fflag.Flag{
-		ID:      "james-flag-1",
+	savedFlag1 := fflag.UpsertFlagParams{
+		Name:    "abc",
 		Enabled: true,
 	}
-	err := flagRepo.Save(savedFlag1)
-	require.NoError(t, err, "could not save test data to DB")
+	flag1, err := flagService.Create(context.Background(), savedFlag1)
+	require.NoError(t, err, "could not setup test data")
 
-	savedFlag2 := fflag.Flag{
-		ID:      "james-flag-2",
-		Enabled: false,
+	savedFlag2 := fflag.UpsertFlagParams{
+		Name:    "def",
+		Enabled: true,
 	}
-	err = flagRepo.Save(savedFlag2)
-	require.NoError(t, err, "could not save test data to DB")
+	flag2, err := flagService.Create(context.Background(), savedFlag2)
+	require.NoError(t, err, "could not setup test data")
 
 	req := httptest.NewRequest(http.MethodGet, "/flags", nil)
+	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
-	api.ServeHTTP(w, req)
+	testApi.NewRouter().ServeHTTP(w, req)
 
 	result := w.Result()
 	assert.Equal(t, http.StatusOK, result.StatusCode)
 
 	resultBody := result.Body
 	defer resultBody.Close()
-	var actualBody fflag.GetResponse
-	err = json.NewDecoder(resultBody).Decode(&actualBody)
+	var actual []fflag.Flag
+	err = json.NewDecoder(resultBody).Decode(&actual)
 	require.NoError(t, err, "could not decode response body")
 
-	assert.Equal(t, 2, len(actualBody.Flags), "unexpected number of flags in response")
+	expected := []fflag.Flag{flag1, flag2}
+
+	assert.Equal(t, http.StatusOK, result.StatusCode)
+	assert.Equal(t, 2, len(actual), "unexpected number of flags in response")
+	assert.Subset(t, expected, actual, "unexpected flags in response")
 }
 
 func TestGetFlag(t *testing.T) {
-	flagRepo := fflag.NewRepo(testDB)
+	resetDB(t)
 
-	savedFlag := fflag.Flag{
-		ID:      "james-flag-3",
-		Enabled: true,
-	}
-	err := flagRepo.Save(savedFlag)
+	savedFlag, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
+		Name:    "blah",
+		Enabled: false,
+	})
 	require.NoError(t, err, "could not save test data to DB")
 
-	req := httptest.NewRequest(http.MethodGet, "/flags/james-flag-3", nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%d", savedFlag.ID), nil)
 	w := httptest.NewRecorder()
-	api.ServeHTTP(w, req)
+	testApi.NewRouter().ServeHTTP(w, req)
 
 	result := w.Result()
 	assert.Equal(t, http.StatusOK, result.StatusCode)
 
 	resultBody := result.Body
 	defer resultBody.Close()
-	var actualBody fflag.Flag
-	err = json.NewDecoder(resultBody).Decode(&actualBody)
+	var actual fflag.Flag
+	err = json.NewDecoder(resultBody).Decode(&actual)
 	require.NoError(t, err, "could not decode response body")
 
-	assert.Equal(t, savedFlag.ID, actualBody.ID)
-	assert.Equal(t, savedFlag.Enabled, actualBody.Enabled)
+	assert.Equal(t, http.StatusOK, result.StatusCode)
+	assert.Equal(t, savedFlag, actual)
 }
 
 func TestPostFlag(t *testing.T) {
-	flagName := "my-flag"
-	reqBody := fflag.PostReqBody{
-		ID: flagName,
+	resetDB(t)
+	key := createAdminKey(t)
+
+	reqBody := fflag.UpsertFlagParams{
+		Name:    "my-flag",
+		Enabled: false,
 	}
 	jsonReqBody, err := json.Marshal(reqBody)
 	require.NoError(t, err, "could not marshal request body")
 
 	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader(jsonReqBody))
+	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
-	api.ServeHTTP(w, req)
+	testApi.NewRouter().ServeHTTP(w, req)
 
 	result := w.Result()
-	assert.Equal(t, http.StatusOK, result.StatusCode)
-
 	resultBody := result.Body
 	defer resultBody.Close()
 	var actualBody fflag.Flag
 	err = json.NewDecoder(resultBody).Decode(&actualBody)
 	require.NoError(t, err, "could not decode response body")
 
-	assert.Equal(t, flagName, actualBody.ID)
-	assert.Equal(t, false, actualBody.Enabled)
+	assert.Equal(t, http.StatusCreated, result.StatusCode, "status code")
+	assert.Equal(t, actualBody.Name, reqBody.Name, "Name")
+	assert.Equal(t, actualBody.Enabled, reqBody.Enabled, "Enabled")
 }
 
-func TestPostFlag_invalidBody(t *testing.T) {
-	flagName := "invalid flag name"
-	reqBody := fflag.PostReqBody{
-		ID: flagName,
+func TestPostFlag_alreadyExists(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	flagName := "some-flag"
+	_, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
+		Name:    flagName,
+		Enabled: false,
+	})
+
+	reqBody := fflag.UpsertFlagParams{
+		Name:    flagName,
+		Enabled: true,
 	}
 	jsonReqBody, err := json.Marshal(reqBody)
 	require.NoError(t, err, "could not marshal request body")
 
 	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader(jsonReqBody))
+	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
-	api.ServeHTTP(w, req)
+	testApi.NewRouter().ServeHTTP(w, req)
 
 	result := w.Result()
-	assert.Equal(t, http.StatusBadRequest, result.StatusCode)
+	assert.Equal(t, http.StatusConflict, result.StatusCode, "status code")
+}
+
+func TestPostFlag_invalidBody(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader([]byte(`{enabled: false}`)))
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusBadRequest, result.StatusCode, "status code")
 }
 
 func TestDeleteFlag(t *testing.T) {
-	flagRepo := fflag.NewRepo(testDB)
+	resetDB(t)
+	key := createAdminKey(t)
 
-	flagName := "vans-flag"
-	savedFlag := fflag.Flag{
-		ID:      flagName,
+	flag, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
+		Name:    "fooBar",
 		Enabled: true,
-	}
-	err := flagRepo.Save(savedFlag)
+	})
 	require.NoError(t, err, "could not save test data to DB")
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/flags/%s", flagName), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/flags/%d", flag.ID), nil)
+	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
-	api.ServeHTTP(w, req)
+	testApi.NewRouter().ServeHTTP(w, req)
 
 	result := w.Result()
-	assert.Equal(t, http.StatusNoContent, result.StatusCode)
+	assert.Equal(t, http.StatusOK, result.StatusCode)
+}
+
+func TestDeleteFlag_notFound(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	req := httptest.NewRequest(http.MethodDelete, "/flags/100", nil)
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusNotFound, result.StatusCode)
 }

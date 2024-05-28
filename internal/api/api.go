@@ -2,38 +2,51 @@ package api
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/j-dumbell/lite-flag/internal/auth"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
-	"github.com/j-dumbell/lite-flag/internal/health"
-	"github.com/j-dumbell/lite-flag/internal/key"
+	"github.com/j-dumbell/lite-flag/pkg/chix"
 )
 
-func New(db *sql.DB, cipherKey []byte) *chi.Mux {
-	flagRepo := fflag.NewRepo(db)
-	keyRepo := key.NewRepo(db, cipherKey)
+var requestTimeout = 20 * time.Second
 
-	healthHander := health.NewHandler(db)
-	flagHandler := fflag.NewHandler(&flagRepo)
-	keyHandler := key.NewHandler(&keyRepo)
+type API struct {
+	db          *sql.DB
+	flagService fflag.Service
+	authService auth.Service
+}
 
+func New(db *sql.DB, flagService fflag.Service, authService auth.Service) API {
+	return API{
+		db:          db,
+		flagService: flagService,
+		authService: authService,
+	}
+}
+
+func (api *API) NewRouter() *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(requestTimeout))
+	r.Use(newRoleMW(api.authService))
 
-	r.Get("/health", healthHander.Get)
+	chix.Get(r, "/healthz", api.Healthcheck)
 
-	r.Get("/flags", flagHandler.Get)
-	r.Post("/flags", flagHandler.Post)
-	r.Get("/flags/{flagID}", flagHandler.GetOne)
-	r.Delete("/flags/{flagID}", flagHandler.Delete)
+	chix.Get(r, "/flags", api.GetFlags, anyRole)
+	chix.Post(r, "/flags", api.PostFlag, adminOnly)
+	chix.Get(r, "/flags/{id}", api.GetFlag)
+	chix.Delete(r, "/flags/{id}", api.DeleteFlag, adminOnly)
 
-	r.Get("/api-keys", keyHandler.Get)
-	r.Post("/api-keys", keyHandler.Post)
-	r.Delete("/api-keys/{keyID}", keyHandler.Delete)
+	chix.Post(r, "/api-keys", api.PostKey, adminOnly)
+	chix.Delete(r, "/api-keys/{id}", api.DeleteKey, adminOnly)
+	chix.Post(r, "/api-keys/{id}/rotate", api.RotateKey, adminOnly)
+
 	return r
 }
