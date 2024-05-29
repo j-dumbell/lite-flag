@@ -53,7 +53,7 @@ func TestDeleteKey(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to insert test key")
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%d", apiKey.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%s", apiKey.Name), nil)
 	req.Header.Add(apiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
@@ -73,7 +73,7 @@ func TestDeleteKey_adminDeletingAdmin(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to insert test key")
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%d", apiKey.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%s", apiKey.Name), nil)
 	req.Header.Add(apiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
@@ -87,7 +87,7 @@ func TestDeleteKey_root(t *testing.T) {
 	resetDB(t)
 	requestorKey := createAdminKey(t)
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%d", requestorKey.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%s", requestorKey.Name), nil)
 	req.Header.Add(apiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
@@ -101,7 +101,7 @@ func TestRotateKey(t *testing.T) {
 	resetDB(t)
 	requestorKey := createAdminKey(t)
 
-	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%d/rotate", requestorKey.ID), nil)
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%s/rotate", requestorKey.Name), nil)
 	req.Header.Add(apiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
@@ -116,7 +116,6 @@ func TestRotateKey(t *testing.T) {
 	assert.Equal(t, http.StatusOK, result.StatusCode, "status code")
 	assert.NotEqual(t, requestorKey.Key, actualBody.Key, "rotated key should not equal original key")
 	assert.Equal(t, requestorKey.Name, actualBody.Name, "Key")
-	assert.Equal(t, requestorKey.ID, actualBody.ID, "ID")
 	assert.Equal(t, requestorKey.Role, actualBody.Role, "Role")
 }
 
@@ -143,7 +142,7 @@ func TestRotateKey_adminRotatingAnothersKey(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to insert test key")
 
-	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%d/rotate", apiKey.ID), nil)
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%s/rotate", apiKey.Name), nil)
 	req.Header.Add(apiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)

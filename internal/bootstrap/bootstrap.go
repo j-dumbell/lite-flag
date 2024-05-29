@@ -16,8 +16,7 @@ var ddls = []string{
 
 	"DROP TABLE IF EXISTS api_keys;",
 	`CREATE TABLE api_keys (
-		id      SERIAL PRIMARY KEY,
-		name    VARCHAR UNIQUE,
+		name    VARCHAR PRIMARY KEY,
 		key     VARCHAR NOT NULL UNIQUE,
 		role    role NOT NULL
 	);`,

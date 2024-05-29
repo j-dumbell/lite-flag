@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/j-dumbell/lite-flag/internal/auth"
@@ -36,13 +35,9 @@ func (api *API) PostKey(r *http.Request) chix.Response {
 }
 
 func (api *API) DeleteKey(r *http.Request) chix.Response {
-	idParam := chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idParam)
-	if err != nil {
-		return chix.NotFound(nil)
-	}
+	name := chi.URLParam(r, "name")
 
-	apiKeyRedacted, err := api.authService.FindOneByID(r.Context(), id)
+	apiKeyRedacted, err := api.authService.FindOneByName(r.Context(), name)
 	if err == auth.ErrKeyNotFound {
 		return chix.NotFound(nil)
 	} else if err != nil {
@@ -57,7 +52,7 @@ func (api *API) DeleteKey(r *http.Request) chix.Response {
 		return chix.Forbidden("admins may only delete API keys with readonly role")
 	}
 
-	if err := api.authService.DeleteByID(r.Context(), id); err != nil {
+	if err := api.authService.DeleteByName(r.Context(), name); err != nil {
 		return chix.InternalServerError()
 	}
 
@@ -65,13 +60,9 @@ func (api *API) DeleteKey(r *http.Request) chix.Response {
 }
 
 func (api *API) RotateKey(r *http.Request) chix.Response {
-	idParam := chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idParam)
-	if err != nil {
-		return chix.NotFound(nil)
-	}
+	name := chi.URLParam(r, "name")
 
-	apiKeyRedacted, err := api.authService.FindOneByID(r.Context(), id)
+	apiKeyRedacted, err := api.authService.FindOneByName(r.Context(), name)
 	if err == auth.ErrKeyNotFound {
 		return chix.NotFound(nil)
 	} else if err != nil {
@@ -79,11 +70,11 @@ func (api *API) RotateKey(r *http.Request) chix.Response {
 	}
 
 	user, _ := getUser(r.Context())
-	if user.Role == auth.RoleAdmin && apiKeyRedacted.ID != user.ID {
+	if user.Role == auth.RoleAdmin && apiKeyRedacted.Name != user.Name {
 		return chix.Forbidden("admins may only rotate their own keys")
 	}
 
-	newApiKey, err := api.authService.RotateKey(r.Context(), id)
+	newApiKey, err := api.authService.RotateKey(r.Context(), name)
 	if err != nil {
 		return chix.InternalServerError()
 	}
