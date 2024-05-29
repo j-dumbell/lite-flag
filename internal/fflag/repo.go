@@ -33,9 +33,10 @@ func (repo *Repo) Create(ctx context.Context, flag Flag) (Flag, error) {
 
 	_, err := repo.db.ExecContext(
 		ctx,
-		`INSERT INTO flags (key, type, boolean_value, string_value, json_value) VALUES ($1, $2, $3, $4, $5)`,
+		`INSERT INTO flags (key, type, is_public, boolean_value, string_value, json_value) VALUES ($1, $2, $3, $4, $5, $6)`,
 		flag.Key,
 		flag.Type,
+		flag.IsPublic,
 		pg.ToNullBool(flag.BooleanValue),
 		pg.ToNullString(flag.StringValue),
 		jsonValue,
@@ -61,9 +62,10 @@ func (repo *Repo) Update(ctx context.Context, flag Flag) (Flag, error) {
 	_, err := repo.db.ExecContext(
 		ctx,
 		`UPDATE flags 
-					SET type = $1, boolean_value = $2, string_value = $3, json_value = $4 
-				WHERE key = $5`,
+					SET type = $1, is_public = $2, boolean_value = $3, string_value = $4, json_value = $5
+				WHERE key = $6`,
 		flag.Type,
+		flag.IsPublic,
 		pg.ToNullBool(flag.BooleanValue),
 		pg.ToNullString(flag.StringValue),
 		jsonValue,
@@ -86,7 +88,7 @@ func parseRows(rows *sql.Rows) ([]Flag, error) {
 		var stringValue sql.NullString
 		var booleanValue sql.NullBool
 		var jsonValue sql.NullString
-		if err := rows.Scan(&flag.Key, &flag.Type, &booleanValue, &stringValue, &jsonValue); err != nil {
+		if err := rows.Scan(&flag.Key, &flag.Type, &flag.IsPublic, &booleanValue, &stringValue, &jsonValue); err != nil {
 			return nil, err
 		}
 
@@ -106,7 +108,7 @@ func parseRows(rows *sql.Rows) ([]Flag, error) {
 }
 
 func (repo *Repo) FindAll(ctx context.Context) ([]Flag, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, boolean_value, string_value, json_value FROM flags;")
+	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, is_public, boolean_value, string_value, json_value FROM flags;")
 	if err != nil {
 		return nil, pg.ParseError(err)
 	}
@@ -115,7 +117,7 @@ func (repo *Repo) FindAll(ctx context.Context) ([]Flag, error) {
 }
 
 func (repo *Repo) FindOneByKey(ctx context.Context, key string) (Flag, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, boolean_value, string_value, json_value FROM flags WHERE key = $1;", key)
+	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, is_public, boolean_value, string_value, json_value FROM flags WHERE key = $1;", key)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}

@@ -22,6 +22,7 @@ func TestGetFlags(t *testing.T) {
 	savedFlag1 := fflag.Flag{
 		Key:          "abc",
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     true,
 		BooleanValue: fp.ToPtr(true),
 	}
 	flag1, err := flagService.Create(context.Background(), savedFlag1)
@@ -30,6 +31,7 @@ func TestGetFlags(t *testing.T) {
 	savedFlag2 := fflag.Flag{
 		Key:          "def",
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     false,
 		BooleanValue: fp.ToPtr(true),
 	}
 	flag2, err := flagService.Create(context.Background(), savedFlag2)
@@ -62,6 +64,7 @@ func TestGetFlag(t *testing.T) {
 	savedFlag, err := flagService.Create(context.Background(), fflag.Flag{
 		Key:          "blah",
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     true,
 		BooleanValue: fp.ToPtr(false),
 	})
 	require.NoError(t, err, "could not save test data to DB")
@@ -83,6 +86,54 @@ func TestGetFlag(t *testing.T) {
 	assert.Equal(t, savedFlag, actual)
 }
 
+func TestGetFlag_notPublic_authorized(t *testing.T) {
+	resetDB(t)
+	key := createReadonlyKey(t)
+
+	savedFlag, err := flagService.Create(context.Background(), fflag.Flag{
+		Key:         "blah",
+		Type:        fflag.FlagTypeString,
+		IsPublic:    false,
+		StringValue: fp.ToPtr("yoyo"),
+	})
+	require.NoError(t, err, "could not save test data to DB")
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%s", savedFlag.Key), nil)
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusOK, result.StatusCode)
+
+	resultBody := result.Body
+	defer resultBody.Close()
+	var actual fflag.Flag
+	err = json.NewDecoder(resultBody).Decode(&actual)
+	require.NoError(t, err, "could not decode response body")
+
+	assert.Equal(t, savedFlag, actual)
+}
+
+func TestGetFlag_notPublic_unauthorized(t *testing.T) {
+	resetDB(t)
+
+	savedFlag, err := flagService.Create(context.Background(), fflag.Flag{
+		Key:         "blah",
+		Type:        fflag.FlagTypeString,
+		IsPublic:    false,
+		StringValue: fp.ToPtr("yoyo"),
+	})
+	require.NoError(t, err, "could not save test data to DB")
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%s", savedFlag.Key), nil)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusUnauthorized, result.StatusCode)
+}
+
 func TestPostFlag(t *testing.T) {
 	resetDB(t)
 	key := createAdminKey(t)
@@ -90,6 +141,7 @@ func TestPostFlag(t *testing.T) {
 	reqBody := fflag.Flag{
 		Key:          "my-flag",
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     true,
 		BooleanValue: fp.ToPtr(false),
 	}
 	jsonReqBody, err := json.Marshal(reqBody)
@@ -123,12 +175,14 @@ func TestPostFlag_alreadyExists(t *testing.T) {
 	_, err := flagService.Create(context.Background(), fflag.Flag{
 		Key:          flagName,
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     true,
 		BooleanValue: fp.ToPtr(false),
 	})
 
 	flag := fflag.Flag{
 		Key:         flagName,
 		Type:        fflag.FlagTypeString,
+		IsPublic:    true,
 		StringValue: fp.ToPtr("abc"),
 	}
 	jsonReqBody, err := json.Marshal(flag)
@@ -163,6 +217,7 @@ func TestDeleteFlag(t *testing.T) {
 	flag, err := flagService.Create(context.Background(), fflag.Flag{
 		Key:          "fooBar",
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     true,
 		BooleanValue: fp.ToPtr(true),
 	})
 	require.NoError(t, err, "could not save test data to DB")
@@ -196,6 +251,7 @@ func TestPutFlag(t *testing.T) {
 	savedFlag1 := fflag.Flag{
 		Key:         "abc",
 		Type:        fflag.FlagTypeString,
+		IsPublic:    true,
 		StringValue: fp.ToPtr("foo-bar"),
 	}
 	_, err := flagService.Create(context.Background(), savedFlag1)
@@ -203,6 +259,7 @@ func TestPutFlag(t *testing.T) {
 
 	reqBody, err := json.Marshal(PutFlagBody{
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     false,
 		BooleanValue: fp.ToPtr(false),
 	})
 	require.NoError(t, err, "failed to marshal req body")
@@ -225,6 +282,7 @@ func TestPutFlag(t *testing.T) {
 	expected := fflag.Flag{
 		Key:          savedFlag1.Key,
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     false,
 		BooleanValue: fp.ToPtr(false),
 	}
 	assert.Equal(t, expected, actual)
@@ -236,6 +294,7 @@ func TestPutFlag_notFound(t *testing.T) {
 
 	reqBody, err := json.Marshal(PutFlagBody{
 		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     true,
 		BooleanValue: fp.ToPtr(false),
 	})
 	require.NoError(t, err, "failed to marshal req body")
