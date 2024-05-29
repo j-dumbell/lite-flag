@@ -3,7 +3,10 @@ package fflag
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 
+	"github.com/j-dumbell/lite-flag/pkg/fp"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
 )
 
@@ -17,34 +20,60 @@ func NewRepo(db *sql.DB) Repo {
 	}
 }
 
-func (repo *Repo) Create(ctx context.Context, params UpsertFlagParams) (Flag, error) {
-	var id int
-	err := repo.db.QueryRowContext(ctx, "INSERT INTO flags (name, enabled) VALUES ($1, $2) RETURNING id", params.Name, params.Enabled).Scan(&id)
+func (repo *Repo) Create(ctx context.Context, flag Flag) (Flag, error) {
+	var jsonValue *string
+	if flag.JSONValue != nil {
+		bytes, err := json.Marshal(flag.JSONValue)
+		if err != nil {
+			return Flag{}, fmt.Errorf("failed to marshal json %w", err)
+		}
+
+		jsonValue = fp.ToPtr(string(bytes))
+	}
+
+	_, err := repo.db.ExecContext(
+		ctx,
+		`INSERT INTO flags (key, type, boolean_value, string_value, json_value) VALUES ($1, $2, $3, $4, $5)`,
+		flag.Key,
+		flag.Type,
+		pg.ToNullBool(flag.BooleanValue),
+		pg.ToNullString(flag.StringValue),
+		jsonValue,
+	)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}
 
-	flag := Flag{
-		ID:      id,
-		Name:    params.Name,
-		Enabled: params.Enabled,
-	}
 	return flag, nil
 }
 
 func (repo *Repo) Update(ctx context.Context, flag Flag) (Flag, error) {
-	_, err := repo.db.ExecContext(ctx, "UPDATE flags SET name = $1, enabled = $2 WHERE id = $3", flag.Name, flag.Enabled, flag.ID)
+	var jsonValue []byte
+	if flag.JSONValue != nil {
+		bytes, err := json.Marshal(flag.JSONValue)
+		if err != nil {
+			return Flag{}, fmt.Errorf("failed to marshal json %w", err)
+		}
+
+		jsonValue = bytes
+	}
+
+	_, err := repo.db.ExecContext(
+		ctx,
+		`UPDATE flags 
+					SET type = $1, boolean_value = $2, string_value = $3, json_value = $4 
+				WHERE key = $5`,
+		flag.Type,
+		pg.ToNullBool(flag.BooleanValue),
+		pg.ToNullString(flag.StringValue),
+		jsonValue,
+		flag.Key,
+	)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}
 
-	updatedFlag := Flag{
-		ID:      flag.ID,
-		Name:    flag.Name,
-		Enabled: flag.Enabled,
-	}
-
-	return updatedFlag, nil
+	return flag, nil
 }
 
 func parseRows(rows *sql.Rows) ([]Flag, error) {
@@ -54,8 +83,20 @@ func parseRows(rows *sql.Rows) ([]Flag, error) {
 	for rows.Next() {
 		var flag Flag
 
-		if err := rows.Scan(&flag.ID, &flag.Name, &flag.Enabled); err != nil {
+		var stringValue sql.NullString
+		var booleanValue sql.NullBool
+		var jsonValue sql.NullString
+		if err := rows.Scan(&flag.Key, &flag.Type, &booleanValue, &stringValue, &jsonValue); err != nil {
 			return nil, err
+		}
+
+		flag.StringValue = pg.FromNullString(stringValue)
+		flag.BooleanValue = pg.FromNullBool(booleanValue)
+		if jsonValue.Valid {
+			err := json.Unmarshal([]byte(jsonValue.String), &flag.JSONValue)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		flags = append(flags, flag)
@@ -65,7 +106,7 @@ func parseRows(rows *sql.Rows) ([]Flag, error) {
 }
 
 func (repo *Repo) FindAll(ctx context.Context) ([]Flag, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT id, name, enabled FROM flags;")
+	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, boolean_value, string_value, json_value FROM flags;")
 	if err != nil {
 		return nil, pg.ParseError(err)
 	}
@@ -73,8 +114,8 @@ func (repo *Repo) FindAll(ctx context.Context) ([]Flag, error) {
 	return parseRows(rows)
 }
 
-func (repo *Repo) FindOne(ctx context.Context, id int) (Flag, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT id, name, enabled FROM flags WHERE id = $1;", id)
+func (repo *Repo) FindOneByKey(ctx context.Context, key string) (Flag, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, boolean_value, string_value, json_value FROM flags WHERE key = $1;", key)
 	if err != nil {
 		return Flag{}, pg.ParseError(err)
 	}
@@ -89,12 +130,7 @@ func (repo *Repo) FindOne(ctx context.Context, id int) (Flag, error) {
 	return flags[0], nil
 }
 
-func (repo *Repo) Delete(ctx context.Context, id int) error {
-	_, err := repo.FindOne(ctx, id)
-	if err != nil {
-		return err
-	}
-
-	_, err = repo.db.QueryContext(ctx, "DELETE FROM flags WHERE id = $1;", id)
+func (repo *Repo) Delete(ctx context.Context, key string) error {
+	_, err := repo.db.QueryContext(ctx, "DELETE FROM flags WHERE key = $1;", key)
 	return pg.ParseError(err)
 }

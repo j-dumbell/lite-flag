@@ -38,7 +38,7 @@ func TestPostKey(t *testing.T) {
 	require.NoError(t, err, "could not decode response reqBody")
 
 	assert.Equal(t, http.StatusCreated, result.StatusCode, "status code")
-	assert.Equal(t, actualBody.Name, reqBody.Name, "Name")
+	assert.Equal(t, actualBody.Name, reqBody.Name, "Key")
 	assert.Equal(t, actualBody.Role, reqBody.Role, "Role")
 	assert.GreaterOrEqual(t, len(actualBody.Key), 40, "Key length")
 }
@@ -115,7 +115,7 @@ func TestRotateKey(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, result.StatusCode, "status code")
 	assert.NotEqual(t, requestorKey.Key, actualBody.Key, "rotated key should not equal original key")
-	assert.Equal(t, requestorKey.Name, actualBody.Name, "Name")
+	assert.Equal(t, requestorKey.Name, actualBody.Name, "Key")
 	assert.Equal(t, requestorKey.ID, actualBody.ID, "ID")
 	assert.Equal(t, requestorKey.Role, actualBody.Role, "Role")
 }

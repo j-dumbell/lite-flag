@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/j-dumbell/lite-flag/internal/fflag"
+	"github.com/j-dumbell/lite-flag/pkg/fp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,16 +19,18 @@ func TestGetFlags(t *testing.T) {
 	resetDB(t)
 	key := createAdminKey(t)
 
-	savedFlag1 := fflag.UpsertFlagParams{
-		Name:    "abc",
-		Enabled: true,
+	savedFlag1 := fflag.Flag{
+		Key:          "abc",
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(true),
 	}
 	flag1, err := flagService.Create(context.Background(), savedFlag1)
 	require.NoError(t, err, "could not setup test data")
 
-	savedFlag2 := fflag.UpsertFlagParams{
-		Name:    "def",
-		Enabled: true,
+	savedFlag2 := fflag.Flag{
+		Key:          "def",
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(true),
 	}
 	flag2, err := flagService.Create(context.Background(), savedFlag2)
 	require.NoError(t, err, "could not setup test data")
@@ -56,13 +59,14 @@ func TestGetFlags(t *testing.T) {
 func TestGetFlag(t *testing.T) {
 	resetDB(t)
 
-	savedFlag, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
-		Name:    "blah",
-		Enabled: false,
+	savedFlag, err := flagService.Create(context.Background(), fflag.Flag{
+		Key:          "blah",
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(false),
 	})
 	require.NoError(t, err, "could not save test data to DB")
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%d", savedFlag.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%s", savedFlag.Key), nil)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -83,9 +87,10 @@ func TestPostFlag(t *testing.T) {
 	resetDB(t)
 	key := createAdminKey(t)
 
-	reqBody := fflag.UpsertFlagParams{
-		Name:    "my-flag",
-		Enabled: false,
+	reqBody := fflag.Flag{
+		Key:          "my-flag",
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(false),
 	}
 	jsonReqBody, err := json.Marshal(reqBody)
 	require.NoError(t, err, "could not marshal request body")
@@ -103,8 +108,11 @@ func TestPostFlag(t *testing.T) {
 	require.NoError(t, err, "could not decode response body")
 
 	assert.Equal(t, http.StatusCreated, result.StatusCode, "status code")
-	assert.Equal(t, actualBody.Name, reqBody.Name, "Name")
-	assert.Equal(t, actualBody.Enabled, reqBody.Enabled, "Enabled")
+	assert.Equal(t, actualBody.Key, reqBody.Key, "Key")
+	assert.Equal(t, actualBody.Type, reqBody.Type, "Type")
+	assert.Equal(t, actualBody.BooleanValue, reqBody.BooleanValue, "BooleanValue")
+	assert.Equal(t, actualBody.StringValue, reqBody.StringValue, "StringValue")
+	assert.Equal(t, actualBody.JSONValue, reqBody.JSONValue, "JSONValue")
 }
 
 func TestPostFlag_alreadyExists(t *testing.T) {
@@ -112,16 +120,18 @@ func TestPostFlag_alreadyExists(t *testing.T) {
 	key := createAdminKey(t)
 
 	flagName := "some-flag"
-	_, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
-		Name:    flagName,
-		Enabled: false,
+	_, err := flagService.Create(context.Background(), fflag.Flag{
+		Key:          flagName,
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(false),
 	})
 
-	reqBody := fflag.UpsertFlagParams{
-		Name:    flagName,
-		Enabled: true,
+	flag := fflag.Flag{
+		Key:         flagName,
+		Type:        fflag.FlagTypeString,
+		StringValue: fp.ToPtr("abc"),
 	}
-	jsonReqBody, err := json.Marshal(reqBody)
+	jsonReqBody, err := json.Marshal(flag)
 	require.NoError(t, err, "could not marshal request body")
 
 	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader(jsonReqBody))
@@ -150,13 +160,14 @@ func TestDeleteFlag(t *testing.T) {
 	resetDB(t)
 	key := createAdminKey(t)
 
-	flag, err := flagService.Create(context.Background(), fflag.UpsertFlagParams{
-		Name:    "fooBar",
-		Enabled: true,
+	flag, err := flagService.Create(context.Background(), fflag.Flag{
+		Key:          "fooBar",
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(true),
 	})
 	require.NoError(t, err, "could not save test data to DB")
 
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/flags/%d", flag.ID), nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/flags/%s", flag.Key), nil)
 	req.Header.Add(apiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
