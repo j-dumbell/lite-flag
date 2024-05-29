@@ -48,14 +48,14 @@ func (repo *Repo) Create(ctx context.Context, flag Flag) (Flag, error) {
 }
 
 func (repo *Repo) Update(ctx context.Context, flag Flag) (Flag, error) {
-	var jsonValue []byte
+	var jsonValue *string
 	if flag.JSONValue != nil {
 		bytes, err := json.Marshal(flag.JSONValue)
 		if err != nil {
 			return Flag{}, fmt.Errorf("failed to marshal json %w", err)
 		}
 
-		jsonValue = bytes
+		jsonValue = fp.ToPtr(string(bytes))
 	}
 
 	_, err := repo.db.ExecContext(

@@ -188,3 +188,63 @@ func TestDeleteFlag_notFound(t *testing.T) {
 	result := w.Result()
 	assert.Equal(t, http.StatusNotFound, result.StatusCode)
 }
+
+func TestPutFlag(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	savedFlag1 := fflag.Flag{
+		Key:         "abc",
+		Type:        fflag.FlagTypeString,
+		StringValue: fp.ToPtr("foo-bar"),
+	}
+	_, err := flagService.Create(context.Background(), savedFlag1)
+	require.NoError(t, err, "could not setup test data")
+
+	reqBody, err := json.Marshal(PutFlagBody{
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(false),
+	})
+	require.NoError(t, err, "failed to marshal req body")
+
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/flags/%s", savedFlag1.Key), bytes.NewReader(reqBody))
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusOK, result.StatusCode)
+
+	resultBody := result.Body
+	defer resultBody.Close()
+	var actual fflag.Flag
+
+	err = json.NewDecoder(resultBody).Decode(&actual)
+	require.NoError(t, err, "could not decode response body")
+
+	expected := fflag.Flag{
+		Key:          savedFlag1.Key,
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(false),
+	}
+	assert.Equal(t, expected, actual)
+}
+
+func TestPutFlag_notFound(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	reqBody, err := json.Marshal(PutFlagBody{
+		Type:         fflag.FlagTypeBoolean,
+		BooleanValue: fp.ToPtr(false),
+	})
+	require.NoError(t, err, "failed to marshal req body")
+
+	req := httptest.NewRequest(http.MethodPut, "/flags/invalid-key", bytes.NewReader(reqBody))
+	req.Header.Add(apiKeyHeader, key.Key)
+	w := httptest.NewRecorder()
+	testApi.NewRouter().ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusNotFound, result.StatusCode)
+}

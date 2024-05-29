@@ -18,9 +18,9 @@ const (
 type Flag struct {
 	Key          string                 `json:"key"`
 	Type         FlagType               `json:"type"`
-	BooleanValue *bool                  `json:"booleanValue"`
-	StringValue  *string                `json:"stringValue"`
-	JSONValue    map[string]interface{} `json:"jsonValue"`
+	BooleanValue *bool                  `json:"booleanValue,omitempty"`
+	StringValue  *string                `json:"stringValue,omitempty"`
+	JSONValue    map[string]interface{} `json:"jsonValue,omitempty"`
 }
 
 func isValidKey(key string) bool {

@@ -61,7 +61,7 @@ func (api *API) PutFlag(r *http.Request) chix.Response {
 		return chix.InternalServerError()
 	}
 
-	return chix.Created(flag)
+	return chix.OK(flag)
 }
 
 func (api *API) GetFlags(r *http.Request) chix.Response {
