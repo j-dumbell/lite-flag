@@ -26,6 +26,7 @@ var ddls = []string{
 	`CREATE TABLE flags (
 		key         	VARCHAR PRIMARY KEY,
 		type        	flag_type NOT NULL,
+		is_public 		BOOLEAN NOT NULL,
 		string_value 	VARCHAR,
 		boolean_value	BOOLEAN,
 		json_value		JSONB

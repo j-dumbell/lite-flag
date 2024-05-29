@@ -18,6 +18,7 @@ const (
 type Flag struct {
 	Key          string                 `json:"key"`
 	Type         FlagType               `json:"type"`
+	IsPublic     bool                   `json:"isPublic"`
 	BooleanValue *bool                  `json:"booleanValue,omitempty"`
 	StringValue  *string                `json:"stringValue,omitempty"`
 	JSONValue    map[string]interface{} `json:"jsonValue,omitempty"`

@@ -79,3 +79,10 @@ func Forbidden(body any) Response {
 		Body:       body,
 	}
 }
+
+func Unauthorized(body any) Response {
+	return Response{
+		StatusCode: http.StatusUnauthorized,
+		Body:       body,
+	}
+}

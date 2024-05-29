@@ -31,6 +31,7 @@ func (api *API) PostFlag(r *http.Request) chix.Response {
 
 type PutFlagBody struct {
 	Type         fflag.FlagType         `json:"type"`
+	IsPublic     bool                   `json:"isPublic"`
 	BooleanValue *bool                  `json:"booleanValue"`
 	StringValue  *string                `json:"stringValue"`
 	JSONValue    map[string]interface{} `json:"jsonValue"`
@@ -47,6 +48,7 @@ func (api *API) PutFlag(r *http.Request) chix.Response {
 	flag := fflag.Flag{
 		Key:          key,
 		Type:         body.Type,
+		IsPublic:     body.IsPublic,
 		BooleanValue: body.BooleanValue,
 		StringValue:  body.StringValue,
 		JSONValue:    body.JSONValue,
@@ -81,6 +83,13 @@ func (api *API) GetFlag(r *http.Request) chix.Response {
 		return chix.NotFound("a flag with that ID does not exist")
 	} else if err != nil {
 		return chix.InternalServerError()
+	}
+
+	if !flag.IsPublic {
+		_, ok := getUser(r.Context())
+		if !ok {
+			return chix.Unauthorized(nil)
+		}
 	}
 
 	return chix.OK(flag)
