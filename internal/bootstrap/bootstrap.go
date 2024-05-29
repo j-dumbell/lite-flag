@@ -11,6 +11,9 @@ var ddls = []string{
 	"DROP TYPE IF EXISTS role CASCADE;",
 	"CREATE TYPE role AS ENUM ('root', 'admin', 'readonly');",
 
+	"DROP TYPE IF EXISTS flag_type CASCADE;",
+	"CREATE TYPE flag_type AS ENUM ('string', 'boolean', 'json');",
+
 	"DROP TABLE IF EXISTS api_keys;",
 	`CREATE TABLE api_keys (
 		id      SERIAL PRIMARY KEY,
@@ -21,9 +24,11 @@ var ddls = []string{
 
 	"DROP TABLE IF EXISTS flags CASCADE;",
 	`CREATE TABLE flags (
-		id          SERIAL PRIMARY KEY,
-		name        VARCHAR NOT NULL UNIQUE,
-		enabled     BOOLEAN NOT NULL
+		key         	VARCHAR PRIMARY KEY,
+		type        	flag_type NOT NULL,
+		string_value 	VARCHAR,
+		boolean_value	BOOLEAN,
+		json_value		JSONB
 	);`,
 }
 
