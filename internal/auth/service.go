@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"slices"
+	"unicode"
 
 	"github.com/j-dumbell/lite-flag/pkg/pg"
 	"github.com/j-dumbell/lite-flag/pkg/validation"
@@ -30,12 +31,12 @@ func newKey() string {
 var ErrAlreadyExists = errors.New("an API key with that name already exists")
 
 func (service *Service) CreateRootKey(ctx context.Context) (ApiKey, error) {
-	createParams := CreateKeyParams{
+	apiKey := ApiKey{
 		Name: "root",
 		Key:  newKey(),
 		Role: RoleRoot,
 	}
-	apiKey, err := service.repo.Create(ctx, createParams)
+	apiKey, err := service.repo.Create(ctx, apiKey)
 	if err == pg.ErrAlreadyExists {
 		return ApiKey{}, ErrAlreadyExists
 	} else if err != nil {
@@ -50,10 +51,23 @@ type CreateApiKeyParams struct {
 	Role Role   `json:"role"`
 }
 
+func isValidName(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	for _, r := range name {
+		if !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func (createApiKeyParams *CreateApiKeyParams) Validate() error {
 	validationResult := validation.Result{}
-	if createApiKeyParams.Name == "" {
-		validationResult.AddFieldError("name", validation.IsRequiredMsg)
+	if !isValidName(createApiKeyParams.Name) {
+		validationResult.AddFieldError("name", "must be non empty, and only contain letters, numbers, hyphens and underscores")
 	}
 	if !slices.Contains([]Role{RoleAdmin, RoleReadonly}, createApiKeyParams.Role) {
 		validationResult.AddFieldError("role", "must be one of 'admin' | 'readonly'")
@@ -67,12 +81,12 @@ func (service *Service) CreateKey(ctx context.Context, params CreateApiKeyParams
 		return ApiKey{}, err
 	}
 
-	createParams := CreateKeyParams{
+	apiKey := ApiKey{
 		Name: params.Name,
 		Key:  newKey(),
 		Role: params.Role,
 	}
-	apiKey, err := service.repo.Create(ctx, createParams)
+	apiKey, err := service.repo.Create(ctx, apiKey)
 	if err == pg.ErrAlreadyExists {
 		return ApiKey{}, ErrAlreadyExists
 	} else if err != nil {
@@ -95,8 +109,8 @@ func (service *Service) FindOneByKey(ctx context.Context, key string) (ApiKeyRed
 	return apiKey, nil
 }
 
-func (service *Service) FindOneByID(ctx context.Context, id int) (ApiKeyRedacted, error) {
-	apiKey, err := service.repo.FindOneByID(ctx, id)
+func (service *Service) FindOneByName(ctx context.Context, name string) (ApiKeyRedacted, error) {
+	apiKey, err := service.repo.FindOneByName(ctx, name)
 	if err == pg.ErrNoRows {
 		return ApiKeyRedacted{}, ErrKeyNotFound
 	} else if err != nil {
@@ -108,8 +122,8 @@ func (service *Service) FindOneByID(ctx context.Context, id int) (ApiKeyRedacted
 
 var ErrCannotDeleteRoot = errors.New("root key cannot be deleted")
 
-func (service *Service) DeleteByID(ctx context.Context, id int) error {
-	apiKey, err := service.repo.FindOneByID(ctx, id)
+func (service *Service) DeleteByName(ctx context.Context, name string) error {
+	apiKey, err := service.repo.FindOneByName(ctx, name)
 	if err == pg.ErrNoRows {
 		return ErrKeyNotFound
 	} else if err != nil {
@@ -120,11 +134,11 @@ func (service *Service) DeleteByID(ctx context.Context, id int) error {
 		return ErrCannotDeleteRoot
 	}
 
-	return service.repo.DeleteByID(ctx, id)
+	return service.repo.DeleteByName(ctx, name)
 }
 
-func (service *Service) RotateKey(ctx context.Context, id int) (ApiKey, error) {
-	apiKeyRedacted, err := service.FindOneByID(ctx, id)
+func (service *Service) RotateKey(ctx context.Context, name string) (ApiKey, error) {
+	apiKeyRedacted, err := service.FindOneByName(ctx, name)
 	if err == pg.ErrNoRows {
 		return ApiKey{}, ErrKeyNotFound
 	} else if err != nil {
@@ -132,8 +146,7 @@ func (service *Service) RotateKey(ctx context.Context, id int) (ApiKey, error) {
 	}
 
 	newApiKey := ApiKey{
-		ID:   id,
-		Name: apiKeyRedacted.Name,
+		Name: name,
 		Key:  newKey(),
 		Role: apiKeyRedacted.Role,
 	}
