@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/j-dumbell/lite-flag/internal/api"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
 	"github.com/j-dumbell/lite-flag/pkg/fp"
 )
@@ -98,10 +99,28 @@ func (client *Client) createFlag(ctx context.Context, flag fflag.Flag) error {
 	return err
 }
 
-// CreateFlagParams is the set of parameters required to create a feature flag.
-type CreateFlagParams[T any] struct {
+// ToDo - add type-safe methods for flag-types.
+func (client *Client) updateFlag(ctx context.Context, flag fflag.Flag) error {
+	if err := flag.Validate(); err != nil {
+		return err
+	}
+
+	body := api.PutFlagBody{
+		Type:         flag.Type,
+		IsPublic:     flag.IsPublic,
+		BooleanValue: flag.BooleanValue,
+		StringValue:  flag.StringValue,
+		JSONValue:    flag.JSONValue,
+	}
+
+	_, err := put[fflag.Flag](ctx, *client, buildURL("flags", flag.Key), body)
+	return err
+}
+
+// UpsertFlagParams is the set of parameters required to create a feature flag.
+type UpsertFlagParams[T any] struct {
 	// Key is the flag's key.  It must be unique, non-empty, and contain only
-	// numbers, letters, underscores and hyphens.
+	// numbers, letters, underscores and hyphens.  It is immutable.
 	Key string
 
 	// IsPublic determines whether the flag is public or not.
@@ -112,7 +131,7 @@ type CreateFlagParams[T any] struct {
 }
 
 // CreateStringFlag creates a new string feature flag.
-func (client *Client) CreateStringFlag(ctx context.Context, params CreateFlagParams[string]) error {
+func (client *Client) CreateStringFlag(ctx context.Context, params UpsertFlagParams[string]) error {
 	flag := fflag.Flag{
 		Key:         params.Key,
 		Type:        fflag.FlagTypeString,
@@ -123,7 +142,7 @@ func (client *Client) CreateStringFlag(ctx context.Context, params CreateFlagPar
 }
 
 // CreateBooleanFlag creates a new boolean feature flag.
-func (client *Client) CreateBooleanFlag(ctx context.Context, params CreateFlagParams[bool]) error {
+func (client *Client) CreateBooleanFlag(ctx context.Context, params UpsertFlagParams[bool]) error {
 	flag := fflag.Flag{
 		Key:          params.Key,
 		Type:         fflag.FlagTypeBoolean,
@@ -134,7 +153,7 @@ func (client *Client) CreateBooleanFlag(ctx context.Context, params CreateFlagPa
 }
 
 // CreateJSONFlag creates a new JSON feature flag.
-func (client *Client) CreateJSONFlag(ctx context.Context, params CreateFlagParams[map[string]interface{}]) error {
+func (client *Client) CreateJSONFlag(ctx context.Context, params UpsertFlagParams[map[string]interface{}]) error {
 	flag := fflag.Flag{
 		Key:       params.Key,
 		Type:      fflag.FlagTypeJSON,

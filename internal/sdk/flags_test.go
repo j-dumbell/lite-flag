@@ -131,7 +131,7 @@ func TestClient_CreateBooleanFlag(t *testing.T) {
 	key := createAdminKey(t)
 	client := NewClient(testServer.URL, &key.Key)
 
-	err := client.CreateBooleanFlag(context.Background(), CreateFlagParams[bool]{
+	err := client.CreateBooleanFlag(context.Background(), UpsertFlagParams[bool]{
 		Key:      "123-4",
 		IsPublic: false,
 		Value:    true,
@@ -144,7 +144,7 @@ func TestClient_CreateStringFlag(t *testing.T) {
 	key := createAdminKey(t)
 	client := NewClient(testServer.URL, &key.Key)
 
-	err := client.CreateStringFlag(context.Background(), CreateFlagParams[string]{
+	err := client.CreateStringFlag(context.Background(), UpsertFlagParams[string]{
 		Key:      "123-4-5",
 		IsPublic: false,
 		Value:    "blahblah",
@@ -157,7 +157,7 @@ func TestClient_CreateJSONFlag(t *testing.T) {
 	key := createAdminKey(t)
 	client := NewClient(testServer.URL, &key.Key)
 
-	err := client.CreateJSONFlag(context.Background(), CreateFlagParams[map[string]interface{}]{
+	err := client.CreateJSONFlag(context.Background(), UpsertFlagParams[map[string]interface{}]{
 		Key:      "123-4-5",
 		IsPublic: false,
 		Value: map[string]interface{}{
