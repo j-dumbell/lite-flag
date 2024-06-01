@@ -38,7 +38,7 @@ func TestGetFlags(t *testing.T) {
 	require.NoError(t, err, "could not setup test data")
 
 	req := httptest.NewRequest(http.MethodGet, "/flags", nil)
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -99,7 +99,7 @@ func TestGetFlag_notPublic_authorized(t *testing.T) {
 	require.NoError(t, err, "could not save test data to DB")
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%s", savedFlag.Key), nil)
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -148,7 +148,7 @@ func TestPostFlag(t *testing.T) {
 	require.NoError(t, err, "could not marshal request body")
 
 	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader(jsonReqBody))
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -189,7 +189,7 @@ func TestPostFlag_alreadyExists(t *testing.T) {
 	require.NoError(t, err, "could not marshal request body")
 
 	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader(jsonReqBody))
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -202,7 +202,7 @@ func TestPostFlag_invalidBody(t *testing.T) {
 	key := createAdminKey(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/flags", bytes.NewReader([]byte(`{enabled: false}`)))
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -223,7 +223,7 @@ func TestDeleteFlag(t *testing.T) {
 	require.NoError(t, err, "could not save test data to DB")
 
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/flags/%s", flag.Key), nil)
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -236,7 +236,7 @@ func TestDeleteFlag_notFound(t *testing.T) {
 	key := createAdminKey(t)
 
 	req := httptest.NewRequest(http.MethodDelete, "/flags/100", nil)
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -265,7 +265,7 @@ func TestPutFlag(t *testing.T) {
 	require.NoError(t, err, "failed to marshal req body")
 
 	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/flags/%s", savedFlag1.Key), bytes.NewReader(reqBody))
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -300,7 +300,7 @@ func TestPutFlag_notFound(t *testing.T) {
 	require.NoError(t, err, "failed to marshal req body")
 
 	req := httptest.NewRequest(http.MethodPut, "/flags/invalid-key", bytes.NewReader(reqBody))
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
