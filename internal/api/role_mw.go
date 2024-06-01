@@ -10,7 +10,7 @@ import (
 type ctxKey int
 
 const ctxKeyUser ctxKey = 0
-const apiKeyHeader = "X-Api-Key"
+const ApiKeyHeader = "X-Api-Key"
 
 func getUser(ctx context.Context) (auth.ApiKeyRedacted, bool) {
 	roleValue := ctx.Value(ctxKeyUser)
@@ -26,7 +26,7 @@ func getUser(ctx context.Context) (auth.ApiKeyRedacted, bool) {
 func newRoleMW(authService auth.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			apiKey := r.Header.Get(apiKeyHeader)
+			apiKey := r.Header.Get(ApiKeyHeader)
 			if apiKey == "" {
 				next.ServeHTTP(w, r)
 				return

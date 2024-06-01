@@ -26,7 +26,7 @@ func TestPostKey(t *testing.T) {
 	require.NoError(t, err, "could not marshal request reqBody")
 
 	req := httptest.NewRequest(http.MethodPost, "/api-keys", bytes.NewReader(jsonReqBody))
-	req.Header.Add(apiKeyHeader, key.Key)
+	req.Header.Add(ApiKeyHeader, key.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -54,7 +54,7 @@ func TestDeleteKey(t *testing.T) {
 	require.NoError(t, err, "failed to insert test key")
 
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%s", apiKey.Name), nil)
-	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	req.Header.Add(ApiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -74,7 +74,7 @@ func TestDeleteKey_adminDeletingAdmin(t *testing.T) {
 	require.NoError(t, err, "failed to insert test key")
 
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%s", apiKey.Name), nil)
-	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	req.Header.Add(ApiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -88,7 +88,7 @@ func TestDeleteKey_root(t *testing.T) {
 	requestorKey := createAdminKey(t)
 
 	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api-keys/%s", requestorKey.Name), nil)
-	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	req.Header.Add(ApiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -102,7 +102,7 @@ func TestRotateKey(t *testing.T) {
 	requestorKey := createAdminKey(t)
 
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%s/rotate", requestorKey.Name), nil)
-	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	req.Header.Add(ApiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -124,7 +124,7 @@ func TestRotateKey_notFound(t *testing.T) {
 	requestorKey := createRootKey(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/api-keys/1000/rotate", nil)
-	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	req.Header.Add(ApiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 
@@ -143,7 +143,7 @@ func TestRotateKey_adminRotatingAnothersKey(t *testing.T) {
 	require.NoError(t, err, "failed to insert test key")
 
 	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api-keys/%s/rotate", apiKey.Name), nil)
-	req.Header.Add(apiKeyHeader, requestorKey.Key)
+	req.Header.Add(ApiKeyHeader, requestorKey.Key)
 	w := httptest.NewRecorder()
 	testApi.NewRouter().ServeHTTP(w, req)
 

@@ -57,6 +57,9 @@ func (flag *Flag) Validate() error {
 		if flag.BooleanValue != nil {
 			validationResult.AddFieldError("booleanValue", "must be nil when flag is string type")
 		}
+		if flag.StringValue == nil {
+			validationResult.AddFieldError("stringValue", "must not be nil when flag is string type")
+		}
 	case FlagTypeBoolean:
 		if flag.JSONValue != nil {
 			validationResult.AddFieldError("jsonValue", "must be nil when flag is boolean type")
@@ -64,12 +67,18 @@ func (flag *Flag) Validate() error {
 		if flag.StringValue != nil {
 			validationResult.AddFieldError("stringValue", "must be nil when flag is boolean type")
 		}
+		if flag.BooleanValue == nil {
+			validationResult.AddFieldError("booleanValue", "must not be nil when flag is boolean type")
+		}
 	case FlagTypeJSON:
 		if flag.StringValue != nil {
 			validationResult.AddFieldError("stringValue", "must be nil when flag is JSON type")
 		}
 		if flag.BooleanValue != nil {
 			validationResult.AddFieldError("booleanValue", "must be nil when flag is JSON type")
+		}
+		if flag.JSONValue == nil {
+			validationResult.AddFieldError("jsonValue", "must not be nil when flag is JSON type")
 		}
 	}
 
