@@ -131,7 +131,7 @@ func TestClient_CreateBooleanFlag(t *testing.T) {
 	key := createAdminKey(t)
 	client := NewClient(testServer.URL, &key.Key)
 
-	err := client.CreateBooleanFlag(context.Background(), UpsertFlagParams[bool]{
+	err := client.CreateBooleanFlag(context.Background(), BooleanFlag{
 		Key:      "123-4",
 		IsPublic: false,
 		Value:    true,
@@ -144,7 +144,7 @@ func TestClient_CreateStringFlag(t *testing.T) {
 	key := createAdminKey(t)
 	client := NewClient(testServer.URL, &key.Key)
 
-	err := client.CreateStringFlag(context.Background(), UpsertFlagParams[string]{
+	err := client.CreateStringFlag(context.Background(), StringFlag{
 		Key:      "123-4-5",
 		IsPublic: false,
 		Value:    "blahblah",
@@ -157,7 +157,7 @@ func TestClient_CreateJSONFlag(t *testing.T) {
 	key := createAdminKey(t)
 	client := NewClient(testServer.URL, &key.Key)
 
-	err := client.CreateJSONFlag(context.Background(), UpsertFlagParams[map[string]interface{}]{
+	err := client.CreateJSONFlag(context.Background(), JSONFlag{
 		Key:      "123-4-5",
 		IsPublic: false,
 		Value: map[string]interface{}{
@@ -165,4 +165,26 @@ func TestClient_CreateJSONFlag(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "CreateJSONFlag should not error")
+}
+
+func TestClient_UpdateFlag(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+	client := NewClient(testServer.URL, &key.Key)
+
+	expectedFlag, err := flagService.Create(context.Background(), fflag.Flag{
+		Key:          "abc",
+		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     true,
+		BooleanValue: fp.ToPtr(true),
+	})
+	require.NoError(t, err, "failed to create test flag")
+
+	err = client.UpdateFlag(context.Background(), fflag.Flag{
+		Key:         expectedFlag.Key,
+		Type:        fflag.FlagTypeString,
+		IsPublic:    false,
+		StringValue: fp.ToPtr("abc"),
+	})
+	require.NoError(t, err, "UpdateFlag should not error")
 }

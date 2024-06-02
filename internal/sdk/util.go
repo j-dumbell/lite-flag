@@ -94,3 +94,17 @@ func put[T any](ctx context.Context, client Client, endpoint string, body any) (
 func delete[T any](ctx context.Context, client Client, endpoint string) (T, error) {
 	return request[T](ctx, client, http.MethodDelete, endpoint, nil)
 }
+
+func toJsonMap(s any) (map[string]interface{}, error) {
+	bytes, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonMap map[string]interface{}
+	if err := json.Unmarshal(bytes, &jsonMap); err != nil {
+		return nil, err
+	}
+
+	return jsonMap, nil
+}
