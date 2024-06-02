@@ -1,4 +1,4 @@
-package array
+package fp
 
 func ArrMap[T any, R any](arr []T, fn func(t T) R) []R {
 	mapped := make([]R, len(arr))
