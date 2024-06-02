@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/j-dumbell/lite-flag/internal/api"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
@@ -99,8 +100,8 @@ func (client *Client) createFlag(ctx context.Context, flag fflag.Flag) error {
 	return err
 }
 
-// ToDo - add type-safe methods for flag-types.
-func (client *Client) updateFlag(ctx context.Context, flag fflag.Flag) error {
+// ToDo - add type-safe methods for flag-types?
+func (client *Client) UpdateFlag(ctx context.Context, flag fflag.Flag) error {
 	if err := flag.Validate(); err != nil {
 		return err
 	}
@@ -126,12 +127,16 @@ type UpsertFlagParams[T any] struct {
 	// IsPublic determines whether the flag is public or not.
 	IsPublic bool
 
-	// Value is the flag's initial value.
+	// Value is the flag's value.
 	Value T
 }
 
+type StringFlag = UpsertFlagParams[string]
+type BooleanFlag = UpsertFlagParams[bool]
+type JSONFlag = UpsertFlagParams[any]
+
 // CreateStringFlag creates a new string feature flag.
-func (client *Client) CreateStringFlag(ctx context.Context, params UpsertFlagParams[string]) error {
+func (client *Client) CreateStringFlag(ctx context.Context, params StringFlag) error {
 	flag := fflag.Flag{
 		Key:         params.Key,
 		Type:        fflag.FlagTypeString,
@@ -142,7 +147,7 @@ func (client *Client) CreateStringFlag(ctx context.Context, params UpsertFlagPar
 }
 
 // CreateBooleanFlag creates a new boolean feature flag.
-func (client *Client) CreateBooleanFlag(ctx context.Context, params UpsertFlagParams[bool]) error {
+func (client *Client) CreateBooleanFlag(ctx context.Context, params BooleanFlag) error {
 	flag := fflag.Flag{
 		Key:          params.Key,
 		Type:         fflag.FlagTypeBoolean,
@@ -153,12 +158,17 @@ func (client *Client) CreateBooleanFlag(ctx context.Context, params UpsertFlagPa
 }
 
 // CreateJSONFlag creates a new JSON feature flag.
-func (client *Client) CreateJSONFlag(ctx context.Context, params UpsertFlagParams[map[string]interface{}]) error {
+func (client *Client) CreateJSONFlag(ctx context.Context, params JSONFlag) error {
+	jsonValue, err := toJsonMap(params.Value)
+	if err != nil {
+		return fmt.Errorf("failed to serialize flag value as JSON: %w", err)
+	}
+
 	flag := fflag.Flag{
 		Key:       params.Key,
 		Type:      fflag.FlagTypeJSON,
 		IsPublic:  params.IsPublic,
-		JSONValue: params.Value,
+		JSONValue: jsonValue,
 	}
 	return client.createFlag(ctx, flag)
 }

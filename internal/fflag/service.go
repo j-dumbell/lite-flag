@@ -34,6 +34,52 @@ func (service *Service) Create(ctx context.Context, flag Flag) (Flag, error) {
 	return flag, nil
 }
 
+// UpsertFlagParams is the set of parameters required to create a feature flag.
+type UpsertFlagParams[T any] struct {
+	// Key is the flag's key.  It must be unique, non-empty, and contain only
+	// numbers, letters, underscores and hyphens.  It is immutable.
+	Key string `json:"key"`
+
+	// IsPublic determines whether the flag is public or not.
+	IsPublic bool `json:"isPublic"`
+
+	// Value is the flag's initial value.
+	Value T `json:"value"`
+}
+
+func (service *Service) CreateStringFlag(ctx context.Context, stringFlag UpsertFlagParams[string]) (Flag, error) {
+	flag := Flag{
+		Key:         stringFlag.Key,
+		Type:        FlagTypeString,
+		IsPublic:    stringFlag.IsPublic,
+		StringValue: &stringFlag.Value,
+	}
+
+	return service.Create(ctx, flag)
+}
+
+func (service *Service) CreateBooleanFlag(ctx context.Context, booleanFlag UpsertFlagParams[bool]) (Flag, error) {
+	flag := Flag{
+		Key:          booleanFlag.Key,
+		Type:         FlagTypeBoolean,
+		IsPublic:     booleanFlag.IsPublic,
+		BooleanValue: &booleanFlag.Value,
+	}
+
+	return service.Create(ctx, flag)
+}
+
+func (service *Service) CreateJSONFlag(ctx context.Context, jsonFlag UpsertFlagParams[map[string]interface{}]) (Flag, error) {
+	flag := Flag{
+		Key:       jsonFlag.Key,
+		Type:      FlagTypeJSON,
+		IsPublic:  jsonFlag.IsPublic,
+		JSONValue: jsonFlag.Value,
+	}
+
+	return service.Create(ctx, flag)
+}
+
 func (service *Service) FindOne(ctx context.Context, key string) (Flag, error) {
 	flag, err := service.repo.FindOneByKey(ctx, key)
 	if err == pg.ErrNoRows {
