@@ -24,7 +24,7 @@ func NewService(repo KeyRepo) Service {
 
 func newKey() string {
 	b := make([]byte, 40)
-	rand.Read(b)
+	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
 

@@ -34,7 +34,7 @@ func writeResponse(handler Handler) http.HandlerFunc {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(response.StatusCode)
-		w.Write(jsonBody)
+		_, _ = w.Write(jsonBody)
 	}
 }
 

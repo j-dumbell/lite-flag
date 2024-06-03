@@ -20,7 +20,6 @@ var testDB *sql.DB
 var flagService fflag.Service
 var authService auth.Service
 var testServer *httptest.Server
-var testClient Client
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
@@ -64,26 +63,11 @@ func resetDB(t *testing.T) {
 	require.NoError(t, err, "failed to reset DB")
 }
 
-func createRootKey(t *testing.T) auth.ApiKey {
-	apiKey, err := authService.CreateRootKey(context.Background())
-	require.NoError(t, err, "failed to create root key")
-	return apiKey
-}
-
 func createAdminKey(t *testing.T) auth.ApiKey {
 	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
 		Name: "admin-test",
 		Role: auth.RoleAdmin,
 	})
 	require.NoError(t, err, "failed to create admin key")
-	return apiKey
-}
-
-func createReadonlyKey(t *testing.T) auth.ApiKey {
-	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
-		Name: "readonly-test",
-		Role: auth.RoleReadonly,
-	})
-	require.NoError(t, err, "failed to create readonly key")
 	return apiKey
 }
