@@ -8,8 +8,8 @@ start-api:
 	docker compose up -d postgres && \
 	DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_NAME=$(DB_NAME) DB_HOST=$(DB_HOST) DB_PORT=$(DB_PORT) go run cmd/api/main.go
 
-
 bootstrap:
+	docker compose up -d postgres && \
 	DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_NAME=$(DB_NAME) DB_HOST=$(DB_HOST) DB_PORT=$(DB_PORT) go run cmd/bootstrap/main.go
 
 build-api:
@@ -32,3 +32,6 @@ docker-run-api:
 
 test:
 	go test ./...
+
+lint:
+	golangci-lint run
