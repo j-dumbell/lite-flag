@@ -131,6 +131,7 @@ func TestGetFlag_notPublic_unauthorized(t *testing.T) {
 	testApi.NewRouter().ServeHTTP(w, req)
 
 	result := w.Result()
+	defer result.Body.Close()
 	assert.Equal(t, http.StatusUnauthorized, result.StatusCode)
 }
 
@@ -178,6 +179,7 @@ func TestPostFlag_alreadyExists(t *testing.T) {
 		IsPublic:     true,
 		BooleanValue: fp.ToPtr(false),
 	})
+	require.NoError(t, err, "failed to create test flag")
 
 	flag := fflag.Flag{
 		Key:         flagName,

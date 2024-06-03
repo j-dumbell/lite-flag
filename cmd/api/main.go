@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,9 +17,51 @@ import (
 const serverAddress = ":8080"
 
 func main() {
-	db, err := pg.Connect(mkPGOptions())
+	if err := run(); err != nil {
+		log.Fatal().Err(err)
+	}
+}
+
+func run() error {
+	host, err := getEnv("DB_HOST")
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to connect to DB")
+		return err
+	}
+
+	portEnv, err := getEnv("DB_PORT")
+	if err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(portEnv)
+	if err != nil {
+		return fmt.Errorf("unable to convert port to integer: %w", err)
+	}
+
+	user, err := getEnv("DB_USER")
+	if err != nil {
+		return err
+	}
+
+	password, err := getEnv("DB_PASSWORD")
+	if err != nil {
+		return err
+	}
+
+	dbName, err := getEnv("DB_NAME")
+	if err != nil {
+		return err
+	}
+
+	db, err := pg.Connect(pg.ConnOptions{
+		DBName:   dbName,
+		Username: user,
+		Password: password,
+		Host:     host,
+		Port:     port,
+		SSLMode:  false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to connect to DB: %w", err)
 	}
 	defer db.Close()
 
@@ -31,35 +74,16 @@ func main() {
 	log.Info().Msgf("starting webserver on address %s", serverAddress)
 	err = http.ListenAndServe(serverAddress, mux.NewRouter())
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to start webserver")
+		return fmt.Errorf("failed to start webserver: %w", err)
 	}
+
+	return nil
 }
 
-func getEnv(envName string) string {
+func getEnv(envName string) (string, error) {
 	envValue, exists := os.LookupEnv(envName)
-	if exists == false {
-		log.Fatal().Msgf("environment variable '%s' does not exist", envName)
+	if !exists {
+		return "", fmt.Errorf("environment variable '%s' does not exist", envName)
 	}
-	return envValue
-}
-
-func mkPGOptions() pg.ConnOptions {
-	host := getEnv("DB_HOST")
-	portEnv := getEnv("DB_PORT")
-	port, err := strconv.Atoi(portEnv)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to convert port to integer")
-	}
-	user := getEnv("DB_USER")
-	password := getEnv("DB_PASSWORD")
-	dbName := getEnv("DB_NAME")
-
-	return pg.ConnOptions{
-		DBName:   dbName,
-		Username: user,
-		Password: password,
-		Host:     host,
-		Port:     port,
-		SSLMode:  false,
-	}
+	return envValue, nil
 }

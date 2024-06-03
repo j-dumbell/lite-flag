@@ -13,12 +13,12 @@ import (
 
 // GetFlags returns all feature flags.
 func (client *Client) GetFlags(ctx context.Context) ([]fflag.Flag, error) {
-	return get[[]fflag.Flag](ctx, *client, "flags")
+	return getReq[[]fflag.Flag](ctx, *client, "flags")
 }
 
 // GetFlag returns a single feature flag by its key.
 func (client *Client) GetFlag(ctx context.Context, key string) (fflag.Flag, error) {
-	return get[fflag.Flag](ctx, *client, buildURL("flags", key))
+	return getReq[fflag.Flag](ctx, *client, buildURL("flags", key))
 }
 
 var ErrFlagValueNil = errors.New("flag value is nil")
@@ -96,7 +96,7 @@ func (client *Client) createFlag(ctx context.Context, flag fflag.Flag) error {
 		return err
 	}
 
-	_, err := post[fflag.Flag](ctx, *client, "flags", flag)
+	_, err := postReq[fflag.Flag](ctx, *client, "flags", flag)
 	return err
 }
 
@@ -114,7 +114,7 @@ func (client *Client) UpdateFlag(ctx context.Context, flag fflag.Flag) error {
 		JSONValue:    flag.JSONValue,
 	}
 
-	_, err := put[fflag.Flag](ctx, *client, buildURL("flags", flag.Key), body)
+	_, err := putReq[fflag.Flag](ctx, *client, buildURL("flags", flag.Key), body)
 	return err
 }
 
@@ -159,7 +159,7 @@ func (client *Client) CreateBooleanFlag(ctx context.Context, params BooleanFlag)
 
 // CreateJSONFlag creates a new JSON feature flag.
 func (client *Client) CreateJSONFlag(ctx context.Context, params JSONFlag) error {
-	jsonValue, err := toJsonMap(params.Value)
+	jsonValue, err := toJSONMap(params.Value)
 	if err != nil {
 		return fmt.Errorf("failed to serialize flag value as JSON: %w", err)
 	}

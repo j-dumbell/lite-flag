@@ -79,30 +79,26 @@ func request[T any](ctx context.Context, client Client, method string, endpoint 
 	return t, nil
 }
 
-func get[T any](ctx context.Context, client Client, endpoint string) (T, error) {
+func getReq[T any](ctx context.Context, client Client, endpoint string) (T, error) {
 	return request[T](ctx, client, http.MethodGet, endpoint, nil)
 }
 
-func post[T any](ctx context.Context, client Client, endpoint string, body any) (T, error) {
+func postReq[T any](ctx context.Context, client Client, endpoint string, body any) (T, error) {
 	return request[T](ctx, client, http.MethodPost, endpoint, body)
 }
 
-func put[T any](ctx context.Context, client Client, endpoint string, body any) (T, error) {
+func putReq[T any](ctx context.Context, client Client, endpoint string, body any) (T, error) {
 	return request[T](ctx, client, http.MethodPut, endpoint, body)
 }
 
-func delete[T any](ctx context.Context, client Client, endpoint string) (T, error) {
-	return request[T](ctx, client, http.MethodDelete, endpoint, nil)
-}
-
-func toJsonMap(s any) (map[string]interface{}, error) {
-	bytes, err := json.Marshal(s)
+func toJSONMap(s any) (map[string]interface{}, error) {
+	sBytes, err := json.Marshal(s)
 	if err != nil {
 		return nil, err
 	}
 
 	var jsonMap map[string]interface{}
-	if err := json.Unmarshal(bytes, &jsonMap); err != nil {
+	if err := json.Unmarshal(sBytes, &jsonMap); err != nil {
 		return nil, err
 	}
 
