@@ -21,21 +21,21 @@ func TestArrMap1(t *testing.T) {
 
 	t.Run("int -> int", func(t *testing.T) {
 		ints := []int{1, 2, 3}
-		actual := ArrMap(ints, square)
+		actual := Map(ints, square)
 		expected := []int{1, 4, 9}
 		assert.Equal(t, expected, actual)
 	})
 
 	t.Run("empty slice", func(t *testing.T) {
 		arr := []int{}
-		actual := ArrMap(arr, square)
+		actual := Map(arr, square)
 		expected := []int{}
 		assert.Equal(t, expected, actual)
 	})
 
 	t.Run("string -> struct", func(t *testing.T) {
 		arr := []string{"a", "b", "c"}
-		actual := ArrMap(arr, stringToStruct)
+		actual := Map(arr, stringToStruct)
 		expected := []someStruct{{"a"}, {"b"}, {"c"}}
 		assert.Equal(t, expected, actual)
 	})

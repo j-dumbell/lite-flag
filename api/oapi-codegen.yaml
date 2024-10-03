@@ -1,0 +1,6 @@
+package: oapi
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+output: internal/oapi/gen.go
