@@ -9,9 +9,30 @@ servers:
     description: Production server
 
 paths:
+  /healthz:
+    get:
+      summary: API healthcheck
+      tags:
+        - healthz
+      responses:
+        '200':
+          description: API healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: API unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
   /flags:
     post:
       summary: Create a new feature flag
+      tags:
+        - flags
       security:
         - ApiKeyAuth: []
       requestBody:
@@ -38,6 +59,8 @@ paths:
 
     get:
       summary: Retrieve all feature flags
+      tags:
+        - flags
       responses:
         '200':
           description: A list of feature flags
@@ -59,6 +82,8 @@ paths:
 
     get:
       summary: Retrieve a single feature flag by key
+      tags:
+        - flags
       responses:
         '200':
           description: The feature flag
@@ -73,6 +98,8 @@ paths:
 
     put:
       summary: Update an existing feature flag
+      tags:
+        - flags
       requestBody:
         required: true
         content:
@@ -97,14 +124,94 @@ paths:
 
     delete:
       summary: Delete a feature flag
+      tags:
+        - flags
       responses:
         '204':
           description: Flag deleted successfully
         '404':
           description: Flag not found
 
+  /api-keys:
+    post:
+      summary: Create a new API key
+      tags:
+        - API keys
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyInput'
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+        '409':
+          description: API key with the given name already exists
+
+  /api-keys/{name}/rotate:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+        description: Name of the API key
+    post:
+      summary: Rotate an API key
+      tags:
+        - API keys
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '201':
+          description: Rotated API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: API key not found
+
 components:
   schemas:
+    HealthResponse:
+      type: object
+      properties:
+        database:
+          type: boolean
+          description: Whether the database is healthy
+      required:
+        - database
+
     Flag:
       type: object
       properties:
@@ -128,6 +235,38 @@ components:
         - type
         - isPublic
         - value
+
+    ApiKey:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Unique identifier for the API key
+        role:
+          type: string
+          enum: [root, admin, readonly]
+          description: The associated permissions of the key
+        key:
+          type: string
+          description: The API Key
+      required:
+        - name
+        - role
+        - key
+
+    ApiKeyInput:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Unique identifier for the API key
+        role:
+          type: string
+          enum: [root, admin, readonly]
+          description: The associated permissions of the key
+      required:
+        - name
+        - role
 
     FlagInput:
       type: object

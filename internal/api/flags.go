@@ -1,109 +1,96 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
-	"github.com/j-dumbell/lite-flag/pkg/chix"
+	"github.com/j-dumbell/lite-flag/internal/oapi"
+	"github.com/j-dumbell/lite-flag/pkg/fp"
 	"github.com/j-dumbell/lite-flag/pkg/validation"
 )
 
-func (api *API) PostFlag(r *http.Request) chix.Response {
-	var body fflag.Flag
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return chix.BadRequest("invalid JSON body")
-	}
+func (srv *server) GetFlags(ctx context.Context, _ oapi.GetFlagsRequestObject) (oapi.GetFlagsResponseObject, error) {
+	_, authenticated := getUser(ctx)
 
-	flag, err := api.flagService.Create(r.Context(), body)
-	if errors.As(err, &validation.Result{}) {
-		return chix.BadRequest(err)
-	} else if errors.Is(err, fflag.ErrAlreadyExists) {
-		return chix.Conflict("a flag with that name already exists")
-	} else if err != nil {
-		return chix.InternalServerError()
-	}
-
-	return chix.Created(flag)
-}
-
-type PutFlagBody struct {
-	Type         fflag.FlagType         `json:"type"`
-	IsPublic     bool                   `json:"isPublic"`
-	BooleanValue *bool                  `json:"booleanValue"`
-	StringValue  *string                `json:"stringValue"`
-	JSONValue    map[string]interface{} `json:"jsonValue"`
-}
-
-func (api *API) PutFlag(r *http.Request) chix.Response {
-	key := chi.URLParam(r, "key")
-
-	var body PutFlagBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return chix.BadRequest("invalid JSON body")
-	}
-
-	flag := fflag.Flag{
-		Key:          key,
-		Type:         body.Type,
-		IsPublic:     body.IsPublic,
-		BooleanValue: body.BooleanValue,
-		StringValue:  body.StringValue,
-		JSONValue:    body.JSONValue,
-	}
-
-	flag, err := api.flagService.Update(r.Context(), flag)
-	if errors.As(err, &validation.Result{}) {
-		return chix.BadRequest(err)
-	} else if errors.Is(err, fflag.ErrNotFound) {
-		return chix.NotFound(nil)
-	} else if err != nil {
-		return chix.InternalServerError()
-	}
-
-	return chix.OK(flag)
-}
-
-func (api *API) GetFlags(r *http.Request) chix.Response {
-	flags, err := api.flagService.FindAll(r.Context(), false)
+	flags, err := srv.flagService.FindAll(ctx, !authenticated)
 	if err != nil {
-		return chix.InternalServerError()
+		return nil, err
 	}
 
-	return chix.OK(flags)
+	return oapi.GetFlags200JSONResponse(fp.Map(flags, toFlagDTO)), nil
 }
 
-func (api *API) GetFlag(r *http.Request) chix.Response {
-	key := chi.URLParam(r, "key")
-
-	flag, err := api.flagService.FindOne(r.Context(), key)
+func (srv *server) GetFlagsKey(ctx context.Context, request oapi.GetFlagsKeyRequestObject) (oapi.GetFlagsKeyResponseObject, error) {
+	flag, err := srv.flagService.FindOne(ctx, request.Key)
 	if errors.Is(err, fflag.ErrNotFound) {
-		return chix.NotFound("a flag with that ID does not exist")
+		return oapi.GetFlagsKey404Response{}, nil
 	} else if err != nil {
-		return chix.InternalServerError()
+		return nil, err
 	}
 
-	if !flag.IsPublic {
-		_, ok := getUser(r.Context())
-		if !ok {
-			return chix.Unauthorized(nil)
-		}
+	_, isAuthenticated := getUser(ctx)
+	if !flag.IsPublic && !isAuthenticated {
+		return oapi.GetFlagsKey403Response{}, nil
 	}
 
-	return chix.OK(flag)
+	return oapi.GetFlagsKey200JSONResponse(toFlagDTO(flag)), nil
 }
 
-func (api *API) DeleteFlag(r *http.Request) chix.Response {
-	key := chi.URLParam(r, "key")
-
-	err := api.flagService.Delete(r.Context(), key)
-	if err == fflag.ErrNotFound {
-		return chix.NotFound(nil)
-	} else if err != nil {
-		return chix.InternalServerError()
+func (srv *server) PostFlags(ctx context.Context, request oapi.PostFlagsRequestObject) (oapi.PostFlagsResponseObject, error) {
+	if request.Body == nil {
+		return oapi.PostFlags400JSONResponse(map[string]interface{}{"error": "no body provided"}), nil
 	}
 
-	return chix.OK(nil)
+	flag, err := toFlag(*request.Body)
+	if err != nil {
+		return oapi.PostFlags400JSONResponse(map[string]interface{}{"error": err.Error()}), nil
+	}
+
+	createdFlag, err := srv.flagService.Create(ctx, flag)
+	if errors.Is(err, fflag.ErrAlreadyExists) {
+		return oapi.PostFlags409Response{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	return oapi.PostFlags201JSONResponse(toFlagDTO(createdFlag)), nil
+}
+
+func (srv *server) DeleteFlagsKey(ctx context.Context, request oapi.DeleteFlagsKeyRequestObject) (oapi.DeleteFlagsKeyResponseObject, error) {
+	err := srv.flagService.Delete(ctx, request.Key)
+	if errors.Is(err, fflag.ErrNotFound) {
+		return oapi.DeleteFlagsKey404Response{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	return oapi.DeleteFlagsKey204Response{}, nil
+}
+
+func (srv *server) PutFlagsKey(ctx context.Context, request oapi.PutFlagsKeyRequestObject) (oapi.PutFlagsKeyResponseObject, error) {
+	flagDTO := oapi.Flag{
+		Key:      request.Key,
+		IsPublic: request.Body.IsPublic,
+		Type:     oapi.FlagType(request.Body.Type),
+		Value:    oapi.Flag_Value(request.Body.Value),
+	}
+
+	flag, err := toFlag(flagDTO)
+	if err != nil {
+		// ToDo - should we return a 400 here?
+		return nil, err
+	}
+
+	updatedFlag, err := srv.flagService.Update(ctx, flag)
+	switch {
+	case errors.Is(err, fflag.ErrNotFound):
+		return oapi.PutFlagsKey404Response{}, nil
+	case errors.As(err, &validation.Result{}):
+		return oapi.PutFlagsKey400JSONResponse(map[string]interface{}{"errors": err}), nil
+	case err != nil:
+		return nil, err
+	}
+
+	return oapi.PutFlagsKey200JSONResponse(toFlagDTO(updatedFlag)), nil
 }

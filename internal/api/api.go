@@ -8,26 +8,83 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/j-dumbell/lite-flag/internal/auth"
 	"github.com/j-dumbell/lite-flag/internal/fflag"
-	"github.com/j-dumbell/lite-flag/pkg/chix"
+	"github.com/j-dumbell/lite-flag/internal/oapi"
 )
 
 var requestTimeout = 20 * time.Second
 
-type API struct {
+func toFlag(flagDTO oapi.Flag) (fflag.Flag, error) {
+	flag := fflag.Flag{
+		Key:      flagDTO.Key,
+		Type:     fflag.FlagType(flagDTO.Type),
+		IsPublic: flagDTO.IsPublic,
+	}
+
+	if flagDTO.Type == oapi.FlagTypeString {
+		flagValue, err := flagDTO.Value.AsFlagValue1()
+		if err != nil {
+			return fflag.Flag{}, err
+		}
+		flag.StringValue = &flagValue
+	}
+
+	if flagDTO.Type == oapi.FlagTypeBoolean {
+		flagValue, err := flagDTO.Value.AsFlagValue0()
+		if err != nil {
+			return fflag.Flag{}, err
+		}
+		flag.BooleanValue = &flagValue
+	}
+
+	// ToDo - json flag
+
+	return flag, nil
+}
+
+func toFlagDTO(flag fflag.Flag) oapi.Flag {
+	flagDTO := oapi.Flag{
+		Key:      flag.Key,
+		Type:     oapi.FlagType(flag.Type),
+		IsPublic: flag.IsPublic,
+	}
+
+	switch flag.Type {
+	case fflag.FlagTypeString:
+		_ = flagDTO.Value.FromFlagValue1(*flag.StringValue)
+	case fflag.FlagTypeBoolean:
+		_ = flagDTO.Value.FromFlagValue0(*flag.BooleanValue)
+	case fflag.FlagTypeJSON:
+		// ToDo
+	}
+
+	return flagDTO
+}
+
+func toApiKeyDTO(apiKey auth.ApiKey) oapi.ApiKey {
+	return oapi.ApiKey{
+		Key:  apiKey.Key,
+		Name: apiKey.Name,
+		Role: oapi.ApiKeyRole(apiKey.Role),
+	}
+}
+
+type server struct {
 	db          *sql.DB
 	flagService fflag.Service
 	authService auth.Service
 }
 
-func New(db *sql.DB, flagService fflag.Service, authService auth.Service) API {
-	return API{
+func New(db *sql.DB, flagService fflag.Service, authService auth.Service) chi.Router {
+	srv := server{
 		db:          db,
 		flagService: flagService,
 		authService: authService,
 	}
-}
 
-func (api *API) NewRouter() *chi.Mux {
+	wrapper := oapi.ServerInterfaceWrapper{
+		Handler: oapi.NewStrictHandler(&srv, nil),
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -35,19 +92,18 @@ func (api *API) NewRouter() *chi.Mux {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(requestTimeout))
-	r.Use(newRoleMW(api.authService))
+	r.Use(newRoleMW(authService))
 
-	chix.Get(r, "/healthz", api.Healthcheck)
+	r.Get("/healthz", wrapper.GetHealthz)
 
-	chix.Get(r, "/flags", api.GetFlags, anyRole)
-	chix.Post(r, "/flags", api.PostFlag, adminOnly)
-	chix.Get(r, "/flags/{key}", api.GetFlag)
-	chix.Put(r, "/flags/{key}", api.PutFlag, adminOnly) // ToDo - add tests
-	chix.Delete(r, "/flags/{key}", api.DeleteFlag, adminOnly)
+	r.Get("/flags", wrapper.GetFlags)
+	r.With(adminOnly).Post("/flags", wrapper.PostFlags)
+	r.With(adminOnly).Delete("/flags/{key}", wrapper.DeleteFlagsKey)
+	r.With(adminOnly).Put("/flags/{key}", wrapper.PutFlagsKey)
+	r.Get("/flags/{key}", wrapper.GetFlagsKey)
 
-	chix.Post(r, "/api-keys", api.PostKey, adminOnly)
-	chix.Delete(r, "/api-keys/{name}", api.DeleteKey, adminOnly)
-	chix.Post(r, "/api-keys/{name}/rotate", api.RotateKey, adminOnly)
+	r.With(adminOnly).Post("/api-keys", wrapper.PostApiKeys)
+	r.With(adminOnly).Post("/api-keys/{name}/rotate", wrapper.PostApiKeysNameRotate)
 
 	return r
 }

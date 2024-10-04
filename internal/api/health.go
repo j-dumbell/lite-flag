@@ -1,20 +1,23 @@
 package api
 
 import (
-	"net/http"
+	"context"
 
-	"github.com/j-dumbell/lite-flag/pkg/chix"
+	"github.com/j-dumbell/lite-flag/internal/oapi"
 )
 
-type healthResponse struct {
-	Database bool `json:"Database"`
-}
-
-func (api *API) Healthcheck(r *http.Request) chix.Response {
-	err := api.db.PingContext(r.Context())
+func (srv *server) GetHealthz(ctx context.Context, _ oapi.GetHealthzRequestObject) (oapi.GetHealthzResponseObject, error) {
+	err := srv.db.PingContext(ctx)
 	if err != nil {
-		response := healthResponse{Database: false}
-		return chix.NotFound(response)
+		response := oapi.GetHealthz503JSONResponse(oapi.HealthResponse{
+			Database: false,
+		})
+		return response, nil
 	}
-	return chix.NoContent()
+
+	response := oapi.GetHealthz200JSONResponse(oapi.HealthResponse{
+		Database: true,
+	})
+
+	return response, nil
 }

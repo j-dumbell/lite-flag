@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/j-dumbell/lite-flag/internal/api"
 	"github.com/j-dumbell/lite-flag/internal/auth"
@@ -16,12 +21,15 @@ import (
 
 const serverAddress = ":8080"
 
+var shutdownTimeout = 10 * time.Second
+
 func main() {
 	if err := run(); err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Send()
 	}
 }
 
+//nolint:funlen
 func run() error {
 	host, err := getEnv("DB_HOST")
 	if err != nil {
@@ -69,12 +77,39 @@ func run() error {
 	flagService := fflag.NewService(flagRepo)
 	keyRepo := auth.NewKeyRepo(db)
 	authService := auth.NewService(keyRepo)
-	mux := api.New(db, flagService, authService)
+	handler := api.New(db, flagService, authService)
 
-	log.Info().Msgf("starting webserver on address %s", serverAddress)
-	err = http.ListenAndServe(serverAddress, mux.NewRouter())
-	if err != nil {
-		return fmt.Errorf("failed to start webserver: %w", err)
+	server := http.Server{
+		Addr:              serverAddress,
+		Handler:           handler,
+		ReadHeaderTimeout: time.Second,
+	}
+
+	serverErrors := make(chan error)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Info().Msgf("starting webserver on address %s", serverAddress)
+		err := server.ListenAndServe()
+		if !errors.Is(err, http.ErrServerClosed) {
+			serverErrors <- err
+		}
+	}()
+
+	select {
+	case err := <-serverErrors:
+		return fmt.Errorf("server error: %w", err)
+	case sig := <-sigChan:
+		log.Info().Msgf("signal %s received; shutting down", sig.String())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		err := server.Shutdown(shutdownCtx)
+		if err != nil {
+			return fmt.Errorf("failed to shutdown gracefully: %w", err)
+		}
+		log.Info().Msg("successfully shutdown gracefully")
 	}
 
 	return nil

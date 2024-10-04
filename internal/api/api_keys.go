@@ -1,83 +1,80 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/j-dumbell/lite-flag/internal/auth"
-	"github.com/j-dumbell/lite-flag/pkg/chix"
+	"github.com/j-dumbell/lite-flag/internal/oapi"
 	"github.com/j-dumbell/lite-flag/pkg/validation"
 )
 
-func (api *API) PostKey(r *http.Request) chix.Response {
-	var body auth.CreateApiKeyParams
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return chix.BadRequest("invalid JSON body")
+func (srv *server) PostApiKeys(ctx context.Context, request oapi.PostApiKeysRequestObject) (oapi.PostApiKeysResponseObject, error) {
+	user, _ := getUser(ctx)
+	if user.Role == auth.RoleAdmin && request.Body.Role != oapi.ApiKeyInputRoleReadonly {
+		return oapi.PostApiKeys403JSONResponse(map[string]interface{}{"error": "admins may only create API keys with readonly role"}), nil
 	}
 
-	user, _ := getUser(r.Context())
-	if user.Role == auth.RoleAdmin && body.Role != auth.RoleReadonly {
-		return chix.Forbidden("admins may only create API keys with readonly role")
+	createApiKeyParams := auth.CreateApiKeyParams{
+		Name: request.Body.Name,
+		Role: auth.Role(request.Body.Role),
 	}
 
-	apiKey, err := api.authService.CreateKey(r.Context(), body)
+	apiKey, err := srv.authService.CreateKey(ctx, createApiKeyParams)
 	if errors.As(err, &validation.Result{}) {
-		return chix.BadRequest(err)
+		return oapi.PostApiKeys400JSONResponse(map[string]interface{}{"error": err}), nil
 	} else if errors.Is(err, auth.ErrAlreadyExists) {
-		return chix.Conflict(err)
+		return oapi.PostApiKeys409Response{}, nil
 	} else if err != nil {
-		return chix.InternalServerError()
+		return nil, err
 	}
 
-	return chix.Created(apiKey)
+	return oapi.PostApiKeys201JSONResponse(toApiKeyDTO(apiKey)), nil
 }
 
-func (api *API) DeleteKey(r *http.Request) chix.Response {
-	name := chi.URLParam(r, "name")
+// ToDo
+// func (srv *server) DeleteKey(r *http.Request) chix.Response {
+// 	name := chi.URLParam(r, "name")
+//
+// 	apiKeyRedacted, err := srv.authService.FindOneByName(r.Context(), name)
+// 	if err == auth.ErrKeyNotFound {
+// 		return chix.NotFound(nil)
+// 	} else if err != nil {
+// 		return chix.InternalServerError()
+// 	}
+//
+// 	requestor, _ := getUser(r.Context())
+// 	if apiKeyRedacted.Role == auth.RoleRoot {
+// 		return chix.Forbidden("root API key cannot be deleted")
+// 	}
+// 	if requestor.Role == auth.RoleAdmin && apiKeyRedacted.Role != auth.RoleReadonly {
+// 		return chix.Forbidden("admins may only delete API keys with readonly role")
+// 	}
+//
+// 	if err := srv.authService.DeleteByName(r.Context(), name); err != nil {
+// 		return chix.InternalServerError()
+// 	}
+//
+// 	return chix.OK(nil)
+// }
 
-	apiKeyRedacted, err := api.authService.FindOneByName(r.Context(), name)
-	if err == auth.ErrKeyNotFound {
-		return chix.NotFound(nil)
+func (srv *server) PostApiKeysNameRotate(ctx context.Context, request oapi.PostApiKeysNameRotateRequestObject) (oapi.PostApiKeysNameRotateResponseObject, error) {
+	apiKeyRedacted, err := srv.authService.FindOneByName(ctx, request.Name)
+	if errors.Is(err, auth.ErrKeyNotFound) {
+		return oapi.PostApiKeysNameRotate404Response{}, nil
 	} else if err != nil {
-		return chix.InternalServerError()
+		return nil, err
 	}
 
-	requestor, _ := getUser(r.Context())
-	if apiKeyRedacted.Role == auth.RoleRoot {
-		return chix.Forbidden("root API key cannot be deleted")
-	}
-	if requestor.Role == auth.RoleAdmin && apiKeyRedacted.Role != auth.RoleReadonly {
-		return chix.Forbidden("admins may only delete API keys with readonly role")
-	}
-
-	if err := api.authService.DeleteByName(r.Context(), name); err != nil {
-		return chix.InternalServerError()
-	}
-
-	return chix.OK(nil)
-}
-
-func (api *API) RotateKey(r *http.Request) chix.Response {
-	name := chi.URLParam(r, "name")
-
-	apiKeyRedacted, err := api.authService.FindOneByName(r.Context(), name)
-	if err == auth.ErrKeyNotFound {
-		return chix.NotFound(nil)
-	} else if err != nil {
-		return chix.InternalServerError()
-	}
-
-	user, _ := getUser(r.Context())
+	user, _ := getUser(ctx)
 	if user.Role == auth.RoleAdmin && apiKeyRedacted.Name != user.Name {
-		return chix.Forbidden("admins may only rotate their own keys")
+		return oapi.PostApiKeysNameRotate403JSONResponse(map[string]interface{}{"error": "admins may only rotate their own keys or readonly keys"}), nil
 	}
 
-	newApiKey, err := api.authService.RotateKey(r.Context(), name)
+	newApiKey, err := srv.authService.RotateKey(ctx, request.Name)
 	if err != nil {
-		return chix.InternalServerError()
+		return nil, err
 	}
 
-	return chix.OK(newApiKey)
+	return oapi.PostApiKeysNameRotate201JSONResponse(toApiKeyDTO(newApiKey)), nil
 }

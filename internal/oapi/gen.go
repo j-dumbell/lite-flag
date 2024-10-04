@@ -18,6 +18,20 @@ const (
 	ApiKeyAuthScopes = "ApiKeyAuth.Scopes"
 )
 
+// Defines values for ApiKeyRole.
+const (
+	ApiKeyRoleAdmin    ApiKeyRole = "admin"
+	ApiKeyRoleReadonly ApiKeyRole = "readonly"
+	ApiKeyRoleRoot     ApiKeyRole = "root"
+)
+
+// Defines values for ApiKeyInputRole.
+const (
+	ApiKeyInputRoleAdmin    ApiKeyInputRole = "admin"
+	ApiKeyInputRoleReadonly ApiKeyInputRole = "readonly"
+	ApiKeyInputRoleRoot     ApiKeyInputRole = "root"
+)
+
 // Defines values for FlagType.
 const (
 	FlagTypeBoolean FlagType = "boolean"
@@ -29,6 +43,33 @@ const (
 	FlagInputTypeBoolean FlagInputType = "boolean"
 	FlagInputTypeString  FlagInputType = "string"
 )
+
+// ApiKey defines model for ApiKey.
+type ApiKey struct {
+	// Key The API Key
+	Key string `json:"key"`
+
+	// Name Unique identifier for the API key
+	Name string `json:"name"`
+
+	// Role The associated permissions of the key
+	Role ApiKeyRole `json:"role"`
+}
+
+// ApiKeyRole The associated permissions of the key
+type ApiKeyRole string
+
+// ApiKeyInput defines model for ApiKeyInput.
+type ApiKeyInput struct {
+	// Name Unique identifier for the API key
+	Name string `json:"name"`
+
+	// Role The associated permissions of the key
+	Role ApiKeyInputRole `json:"role"`
+}
+
+// ApiKeyInputRole The associated permissions of the key
+type ApiKeyInputRole string
 
 // Flag defines model for Flag.
 type Flag struct {
@@ -84,6 +125,15 @@ type FlagInputValue1 = string
 type FlagInput_Value struct {
 	union json.RawMessage
 }
+
+// HealthResponse defines model for HealthResponse.
+type HealthResponse struct {
+	// Database Whether the database is healthy
+	Database bool `json:"database"`
+}
+
+// PostApiKeysJSONRequestBody defines body for PostApiKeys for application/json ContentType.
+type PostApiKeysJSONRequestBody = ApiKeyInput
 
 // PostFlagsJSONRequestBody defines body for PostFlags for application/json ContentType.
 type PostFlagsJSONRequestBody = Flag
@@ -217,6 +267,12 @@ func (t *FlagInput_Value) UnmarshalJSON(b []byte) error {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Create a new API key
+	// (POST /api-keys)
+	PostApiKeys(w http.ResponseWriter, r *http.Request)
+	// Rotate an API key
+	// (POST /api-keys/{name}/rotate)
+	PostApiKeysNameRotate(w http.ResponseWriter, r *http.Request, name string)
 	// Retrieve all feature flags
 	// (GET /flags)
 	GetFlags(w http.ResponseWriter, r *http.Request)
@@ -232,11 +288,26 @@ type ServerInterface interface {
 	// Update an existing feature flag
 	// (PUT /flags/{key})
 	PutFlagsKey(w http.ResponseWriter, r *http.Request, key string)
+	// API healthcheck
+	// (GET /healthz)
+	GetHealthz(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Create a new API key
+// (POST /api-keys)
+func (_ Unimplemented) PostApiKeys(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Rotate an API key
+// (POST /api-keys/{name}/rotate)
+func (_ Unimplemented) PostApiKeysNameRotate(w http.ResponseWriter, r *http.Request, name string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Retrieve all feature flags
 // (GET /flags)
@@ -268,6 +339,12 @@ func (_ Unimplemented) PutFlagsKey(w http.ResponseWriter, r *http.Request, key s
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// API healthcheck
+// (GET /healthz)
+func (_ Unimplemented) GetHealthz(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ServerInterfaceWrapper converts contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler            ServerInterface
@@ -276,6 +353,57 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// PostApiKeys operation middleware
+func (siw *ServerInterfaceWrapper) PostApiKeys(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostApiKeysNameRotate operation middleware
+func (siw *ServerInterfaceWrapper) PostApiKeysNameRotate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostApiKeysNameRotate(w, r, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetFlags operation middleware
 func (siw *ServerInterfaceWrapper) GetFlags(w http.ResponseWriter, r *http.Request) {
@@ -410,6 +538,26 @@ func (siw *ServerInterfaceWrapper) PutFlagsKey(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetHealthz operation middleware
+func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetHealthz(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -524,6 +672,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api-keys", wrapper.PostApiKeys)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api-keys/{name}/rotate", wrapper.PostApiKeysNameRotate)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/flags", wrapper.GetFlags)
 	})
 	r.Group(func(r chi.Router) {
@@ -538,8 +692,104 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/flags/{key}", wrapper.PutFlagsKey)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/healthz", wrapper.GetHealthz)
+	})
 
 	return r
+}
+
+type PostApiKeysRequestObject struct {
+	Body *PostApiKeysJSONRequestBody
+}
+
+type PostApiKeysResponseObject interface {
+	VisitPostApiKeysResponse(w http.ResponseWriter) error
+}
+
+type PostApiKeys201JSONResponse ApiKey
+
+func (response PostApiKeys201JSONResponse) VisitPostApiKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostApiKeys400JSONResponse map[string]interface{}
+
+func (response PostApiKeys400JSONResponse) VisitPostApiKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostApiKeys401Response struct {
+}
+
+func (response PostApiKeys401Response) VisitPostApiKeysResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type PostApiKeys403JSONResponse map[string]interface{}
+
+func (response PostApiKeys403JSONResponse) VisitPostApiKeysResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostApiKeys409Response struct {
+}
+
+func (response PostApiKeys409Response) VisitPostApiKeysResponse(w http.ResponseWriter) error {
+	w.WriteHeader(409)
+	return nil
+}
+
+type PostApiKeysNameRotateRequestObject struct {
+	Name string `json:"name"`
+}
+
+type PostApiKeysNameRotateResponseObject interface {
+	VisitPostApiKeysNameRotateResponse(w http.ResponseWriter) error
+}
+
+type PostApiKeysNameRotate201JSONResponse ApiKey
+
+func (response PostApiKeysNameRotate201JSONResponse) VisitPostApiKeysNameRotateResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostApiKeysNameRotate401Response struct {
+}
+
+func (response PostApiKeysNameRotate401Response) VisitPostApiKeysNameRotateResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type PostApiKeysNameRotate403JSONResponse map[string]interface{}
+
+func (response PostApiKeysNameRotate403JSONResponse) VisitPostApiKeysNameRotateResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostApiKeysNameRotate404Response struct {
+}
+
+func (response PostApiKeysNameRotate404Response) VisitPostApiKeysNameRotateResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
 }
 
 type GetFlagsRequestObject struct {
@@ -684,8 +934,39 @@ func (response PutFlagsKey404Response) VisitPutFlagsKeyResponse(w http.ResponseW
 	return nil
 }
 
+type GetHealthzRequestObject struct {
+}
+
+type GetHealthzResponseObject interface {
+	VisitGetHealthzResponse(w http.ResponseWriter) error
+}
+
+type GetHealthz200JSONResponse HealthResponse
+
+func (response GetHealthz200JSONResponse) VisitGetHealthzResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetHealthz503JSONResponse HealthResponse
+
+func (response GetHealthz503JSONResponse) VisitGetHealthzResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Create a new API key
+	// (POST /api-keys)
+	PostApiKeys(ctx context.Context, request PostApiKeysRequestObject) (PostApiKeysResponseObject, error)
+	// Rotate an API key
+	// (POST /api-keys/{name}/rotate)
+	PostApiKeysNameRotate(ctx context.Context, request PostApiKeysNameRotateRequestObject) (PostApiKeysNameRotateResponseObject, error)
 	// Retrieve all feature flags
 	// (GET /flags)
 	GetFlags(ctx context.Context, request GetFlagsRequestObject) (GetFlagsResponseObject, error)
@@ -701,6 +982,9 @@ type StrictServerInterface interface {
 	// Update an existing feature flag
 	// (PUT /flags/{key})
 	PutFlagsKey(ctx context.Context, request PutFlagsKeyRequestObject) (PutFlagsKeyResponseObject, error)
+	// API healthcheck
+	// (GET /healthz)
+	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -730,6 +1014,63 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// PostApiKeys operation middleware
+func (sh *strictHandler) PostApiKeys(w http.ResponseWriter, r *http.Request) {
+	var request PostApiKeysRequestObject
+
+	var body PostApiKeysJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostApiKeys(ctx, request.(PostApiKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostApiKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostApiKeysResponseObject); ok {
+		if err := validResponse.VisitPostApiKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostApiKeysNameRotate operation middleware
+func (sh *strictHandler) PostApiKeysNameRotate(w http.ResponseWriter, r *http.Request, name string) {
+	var request PostApiKeysNameRotateRequestObject
+
+	request.Name = name
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostApiKeysNameRotate(ctx, request.(PostApiKeysNameRotateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostApiKeysNameRotate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostApiKeysNameRotateResponseObject); ok {
+		if err := validResponse.VisitPostApiKeysNameRotateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetFlags operation middleware
@@ -865,6 +1206,30 @@ func (sh *strictHandler) PutFlagsKey(w http.ResponseWriter, r *http.Request, key
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutFlagsKeyResponseObject); ok {
 		if err := validResponse.VisitPutFlagsKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetHealthz operation middleware
+func (sh *strictHandler) GetHealthz(w http.ResponseWriter, r *http.Request) {
+	var request GetHealthzRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetHealthz(ctx, request.(GetHealthzRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetHealthz")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetHealthzResponseObject); ok {
+		if err := validResponse.VisitGetHealthzResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

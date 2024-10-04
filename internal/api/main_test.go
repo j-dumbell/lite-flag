@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -19,9 +20,9 @@ import (
 )
 
 var testDB *sql.DB
-var testApi API
 var flagService fflag.Service
 var authService auth.Service
+var testHandler http.Handler
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
@@ -82,7 +83,7 @@ func TestMain(m *testing.M) {
 
 	keyRepo := auth.NewKeyRepo(testDB)
 	authService = auth.NewService(keyRepo)
-	testApi = New(testDB, flagService, authService)
+	testHandler = New(testDB, flagService, authService)
 
 	code := m.Run()
 	os.Exit(code)
