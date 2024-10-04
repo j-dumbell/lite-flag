@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/j-dumbell/lite-flag/pkg/fp"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
 )
 
@@ -91,8 +92,11 @@ func (service *Service) FindOne(ctx context.Context, key string) (Flag, error) {
 	return flag, nil
 }
 
-func (service *Service) FindAll(ctx context.Context) ([]Flag, error) {
-	return service.repo.FindAll(ctx)
+func (service *Service) FindAll(ctx context.Context, publicOnly bool) ([]Flag, error) {
+	if publicOnly {
+		return service.repo.Find(ctx, Filters{IsPublic: fp.ToPtr(true)})
+	}
+	return service.repo.Find(ctx, Filters{})
 }
 
 var ErrNotFound = errors.New("no flag found")

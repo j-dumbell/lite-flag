@@ -633,6 +633,14 @@ func (response GetFlagsKey200JSONResponse) VisitGetFlagsKeyResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetFlagsKey403Response struct {
+}
+
+func (response GetFlagsKey403Response) VisitGetFlagsKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(403)
+	return nil
+}
+
 type GetFlagsKey404Response struct {
 }
 

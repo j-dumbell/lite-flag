@@ -67,7 +67,7 @@ func (api *API) PutFlag(r *http.Request) chix.Response {
 }
 
 func (api *API) GetFlags(r *http.Request) chix.Response {
-	flags, err := api.flagService.FindAll(r.Context())
+	flags, err := api.flagService.FindAll(r.Context(), false)
 	if err != nil {
 		return chix.InternalServerError()
 	}

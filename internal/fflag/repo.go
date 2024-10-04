@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/j-dumbell/lite-flag/pkg/fp"
 	"github.com/j-dumbell/lite-flag/pkg/pg"
@@ -107,8 +108,42 @@ func parseRows(rows *sql.Rows) ([]Flag, error) {
 	return flags, nil
 }
 
-func (repo *Repo) FindAll(ctx context.Context) ([]Flag, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, is_public, boolean_value, string_value, json_value FROM flags;")
+func (repo *Repo) FindOneByKey(ctx context.Context, key string) (Flag, error) {
+	return repo.FindOne(ctx, Filters{Key: &key})
+}
+
+func (repo *Repo) Delete(ctx context.Context, key string) error {
+	_, err := repo.db.QueryContext(ctx, "DELETE FROM flags WHERE key = $1;", key)
+	return pg.ParseError(err)
+}
+
+type Filters struct {
+	Key      *string
+	IsPublic *bool
+}
+
+func (repo *Repo) Find(ctx context.Context, filters Filters) ([]Flag, error) {
+	conditions := []string{}
+	args := []any{}
+	argIndex := 1
+
+	if filters.Key != nil {
+		conditions = append(conditions, fmt.Sprintf("key = $%d", argIndex))
+		args = append(args, *filters.Key)
+		argIndex++
+	}
+	if filters.IsPublic != nil {
+		conditions = append(conditions, fmt.Sprintf("is_public = $%d", argIndex))
+		args = append(args, *filters.IsPublic)
+		argIndex++
+	}
+
+	query := fmt.Sprintf("SELECT key, type, is_public, boolean_value, string_value, json_value FROM flags")
+	if len(conditions) > 0 {
+		query += fmt.Sprintf(" WHERE %s", strings.Join(conditions, " AND "))
+	}
+
+	rows, err := repo.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, pg.ParseError(err)
 	}
@@ -116,13 +151,8 @@ func (repo *Repo) FindAll(ctx context.Context) ([]Flag, error) {
 	return parseRows(rows)
 }
 
-func (repo *Repo) FindOneByKey(ctx context.Context, key string) (Flag, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT key, type, is_public, boolean_value, string_value, json_value FROM flags WHERE key = $1;", key)
-	if err != nil {
-		return Flag{}, pg.ParseError(err)
-	}
-
-	flags, err := parseRows(rows)
+func (repo *Repo) FindOne(ctx context.Context, filters Filters) (Flag, error) {
+	flags, err := repo.Find(ctx, filters)
 	if err != nil {
 		return Flag{}, err
 	}
@@ -130,9 +160,4 @@ func (repo *Repo) FindOneByKey(ctx context.Context, key string) (Flag, error) {
 		return Flag{}, pg.ErrNoRows
 	}
 	return flags[0], nil
-}
-
-func (repo *Repo) Delete(ctx context.Context, key string) error {
-	_, err := repo.db.QueryContext(ctx, "DELETE FROM flags WHERE key = $1;", key)
-	return pg.ParseError(err)
 }

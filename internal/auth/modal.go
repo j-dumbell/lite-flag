@@ -16,6 +16,13 @@ type ApiKey struct {
 	Role Role   `json:"role"`
 }
 
+func (apiKey *ApiKey) Redact() ApiKeyRedacted {
+	return ApiKeyRedacted{
+		Name: apiKey.Name,
+		Role: apiKey.Role,
+	}
+}
+
 type ApiKeyRedacted struct {
 	Name string `json:"name"`
 	Role Role   `json:"role"`

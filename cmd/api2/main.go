@@ -29,6 +29,7 @@ func main() {
 	}
 }
 
+//nolint:funlen
 func run() error {
 	host, err := getEnv("DB_HOST")
 	if err != nil {
@@ -79,12 +80,13 @@ func run() error {
 	handler := api2.New(db, flagService, authService)
 
 	server := http.Server{
-		Addr:    serverAddress,
-		Handler: handler,
+		Addr:              serverAddress,
+		Handler:           handler,
+		ReadHeaderTimeout: time.Second,
 	}
 
 	serverErrors := make(chan error)
-	sigChan := make(chan os.Signal)
+	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {

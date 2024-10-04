@@ -11,7 +11,9 @@ import (
 )
 
 func (server *server) GetFlags(ctx context.Context, _ oapi.GetFlagsRequestObject) (oapi.GetFlagsResponseObject, error) {
-	flags, err := server.flagService.FindAll(ctx)
+	_, authenticated := getUser(ctx)
+
+	flags, err := server.flagService.FindAll(ctx, !authenticated)
 	if err != nil {
 		return nil, err
 	}
@@ -25,6 +27,11 @@ func (server *server) GetFlagsKey(ctx context.Context, request oapi.GetFlagsKeyR
 		return oapi.GetFlagsKey404Response{}, nil
 	} else if err != nil {
 		return nil, err
+	}
+
+	_, isAuthenticated := getUser(ctx)
+	if !flag.IsPublic && !isAuthenticated {
+		return oapi.GetFlagsKey403Response{}, nil
 	}
 
 	return oapi.GetFlagsKey200JSONResponse(toFlagDTO(flag)), nil

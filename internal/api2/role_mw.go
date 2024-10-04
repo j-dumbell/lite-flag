@@ -22,6 +22,10 @@ func getUser(ctx context.Context) (auth.ApiKeyRedacted, bool) {
 	return apiKeyRedacted, true
 }
 
+func contextWithUser(ctx context.Context, user auth.ApiKeyRedacted) context.Context {
+	return context.WithValue(ctx, ctxKeyUser, user)
+}
+
 // newRoleMW is a middleware which reads the API key provided in the headers
 // and writes the corresponding role to the request context if valid.
 func newRoleMW(authService auth.Service) func(http.Handler) http.Handler {
@@ -39,7 +43,7 @@ func newRoleMW(authService auth.Service) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), ctxKeyUser, apiKeyRedacted)
+			ctx := contextWithUser(r.Context(), apiKeyRedacted)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 

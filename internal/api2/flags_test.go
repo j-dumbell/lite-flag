@@ -23,7 +23,7 @@ func TestGetFlags(t *testing.T) {
 		Key:          "abc",
 		Type:         fflag.FlagTypeBoolean,
 		IsPublic:     true,
-		BooleanValue: fp.ToPtr(true),
+		BooleanValue: fp.ToPtr(false),
 	}
 	flag1, err := flagService.Create(context.Background(), savedFlag1)
 	require.NoError(t, err, "could not setup test data")
@@ -37,23 +37,47 @@ func TestGetFlags(t *testing.T) {
 	flag2, err := flagService.Create(context.Background(), savedFlag2)
 	require.NoError(t, err, "could not setup test data")
 
-	req := httptest.NewRequest(http.MethodGet, "/flags", nil)
-	w := httptest.NewRecorder()
-	testHandler.ServeHTTP(w, req)
+	t.Run("authorized", func(t *testing.T) {
+		key := createAdminKey(t)
+		req := httptest.NewRequest(http.MethodGet, "/flags", nil)
+		req.Header.Add(ApiKeyHeader, key.Key)
+		w := httptest.NewRecorder()
+		testHandler.ServeHTTP(w, req)
 
-	result := w.Result()
-	assert.Equal(t, http.StatusOK, result.StatusCode)
+		result := w.Result()
+		assert.Equal(t, http.StatusOK, result.StatusCode)
 
-	resultBody := result.Body
-	defer resultBody.Close()
-	var actual []oapi.Flag
-	err = json.NewDecoder(resultBody).Decode(&actual)
-	require.NoError(t, err, "could not decode response body")
+		resultBody := result.Body
+		defer resultBody.Close()
+		var actual []oapi.Flag
+		err = json.NewDecoder(resultBody).Decode(&actual)
+		require.NoError(t, err, "could not decode response body")
 
-	expected := fp.Map([]fflag.Flag{flag1, flag2}, toFlagDTO)
+		expected := fp.Map([]fflag.Flag{flag1, flag2}, toFlagDTO)
 
-	assert.Equal(t, http.StatusOK, result.StatusCode)
-	assert.ElementsMatch(t, expected, actual, "unexpected flags in response")
+		assert.Equal(t, http.StatusOK, result.StatusCode, "status code")
+		assert.ElementsMatch(t, expected, actual, "response body")
+	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/flags", nil)
+		w := httptest.NewRecorder()
+		testHandler.ServeHTTP(w, req)
+
+		result := w.Result()
+		assert.Equal(t, http.StatusOK, result.StatusCode)
+
+		resultBody := result.Body
+		defer resultBody.Close()
+		var actual []oapi.Flag
+		err = json.NewDecoder(resultBody).Decode(&actual)
+		require.NoError(t, err, "could not decode response body")
+
+		expected := fp.Map([]fflag.Flag{flag1}, toFlagDTO)
+
+		assert.Equal(t, http.StatusOK, result.StatusCode, "status code")
+		assert.ElementsMatch(t, expected, actual, "response body")
+	})
 }
 
 func TestPostFlag(t *testing.T) {
@@ -165,6 +189,50 @@ func TestGetFlag(t *testing.T) {
 	assert.Equal(t, toFlagDTO(savedFlag), actual, "response body")
 }
 
+func TestGetFlag_forbidden(t *testing.T) {
+	resetDB(t)
+
+	flag := fflag.Flag{
+		Key:          "abc-123",
+		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     false,
+		BooleanValue: fp.ToPtr(true),
+	}
+	savedFlag, err := flagService.Create(context.Background(), flag)
+	require.NoError(t, err, "could not setup test data")
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%s", savedFlag.Key), nil)
+
+	w := httptest.NewRecorder()
+	testHandler.ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusForbidden, result.StatusCode, "status code")
+}
+
+func TestGetFlag_privateAndAuthenticated(t *testing.T) {
+	resetDB(t)
+	key := createAdminKey(t)
+
+	flag := fflag.Flag{
+		Key:          "abc-123",
+		Type:         fflag.FlagTypeBoolean,
+		IsPublic:     false,
+		BooleanValue: fp.ToPtr(true),
+	}
+	savedFlag, err := flagService.Create(context.Background(), flag)
+	require.NoError(t, err, "could not setup test data")
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/flags/%s", savedFlag.Key), nil)
+	req.Header.Add(ApiKeyHeader, key.Key)
+
+	w := httptest.NewRecorder()
+	testHandler.ServeHTTP(w, req)
+
+	result := w.Result()
+	assert.Equal(t, http.StatusOK, result.StatusCode, "status code")
+}
+
 func TestGetFlag_notFound(t *testing.T) {
 	resetDB(t)
 
@@ -194,7 +262,7 @@ func TestPutFlag(t *testing.T) {
 		IsPublic: true,
 		Type:     oapi.FlagInputTypeString,
 	}
-	updateFlagBody.Value.FromFlagInputValue1("xyz")
+	_ = updateFlagBody.Value.FromFlagInputValue1("xyz")
 
 	updateFlagBodyBytes, err := json.Marshal(updateFlagBody)
 	require.NoError(t, err, "failed to marshal request body")
