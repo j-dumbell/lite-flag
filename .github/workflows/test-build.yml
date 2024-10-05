@@ -20,7 +20,10 @@ jobs:
         go-version: '1.21'
 
     - name: oapi-codegen diff
-      run: make oapi-gen && git diff --exit-code
+      run: |
+        go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest && \
+        make oapi-gen && \
+        git diff --exit-code
 
     - name: Test
       run: make test
