@@ -40,4 +40,5 @@ oapi-gen:
 	cd api && oapi-codegen --config=oapi-codegen.yaml ../oapi/spec.yaml
 
 gen-clients:
-	openapi-generator generate -i ./oapi/spec.yaml -g typescript-axios -o ./clients/typescript
+	openapi-generator generate -i ./oapi/spec.yaml -g typescript-axios -o ./clients/typescript && \
+	openapi-generator generate -i ./oapi/spec.yaml -g go -o ./clients/go
