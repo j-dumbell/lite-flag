@@ -17,7 +17,6 @@ docs/FlagsAPI.md
 docs/HealthResponse.md
 docs/HealthzAPI.md
 git_push.sh
-go.mod
 go.sum
 model_api_key.go
 model_api_key_input.go

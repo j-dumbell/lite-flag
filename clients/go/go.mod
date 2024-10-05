@@ -1,4 +1,4 @@
-module github.com/GIT_USER_ID/GIT_REPO_ID
+module github.com/j-dumbell/lite-flag/clients/go
 
 go 1.18
 
