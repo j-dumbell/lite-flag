@@ -125,20 +125,20 @@ type Filters struct {
 func (repo *Repo) Find(ctx context.Context, filters Filters) ([]Flag, error) {
 	conditions := []string{}
 	args := []any{}
-	argIndex := 1
+	argIndex := 0
 
 	if filters.Key != nil {
+		argIndex++
 		conditions = append(conditions, fmt.Sprintf("key = $%d", argIndex))
 		args = append(args, *filters.Key)
-		argIndex++
 	}
 	if filters.IsPublic != nil {
+		argIndex++
 		conditions = append(conditions, fmt.Sprintf("is_public = $%d", argIndex))
 		args = append(args, *filters.IsPublic)
-		argIndex++
 	}
 
-	query := fmt.Sprintf("SELECT key, type, is_public, boolean_value, string_value, json_value FROM flags")
+	query := "SELECT key, type, is_public, boolean_value, string_value, json_value FROM flags"
 	if len(conditions) > 0 {
 		query += fmt.Sprintf(" WHERE %s", strings.Join(conditions, " AND "))
 	}

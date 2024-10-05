@@ -28,5 +28,4 @@ func authMW(permittedRoles ...auth.Role) func(http.Handler) http.Handler {
 	}
 }
 
-var anyRole = authMW(auth.AllRoles...)
 var adminOnly = authMW(auth.RoleRoot, auth.RoleAdmin)

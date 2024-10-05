@@ -108,12 +108,3 @@ func createAdminKey(t *testing.T) auth.ApiKey {
 	require.NoError(t, err, "failed to create admin key")
 	return apiKey
 }
-
-func createReadonlyKey(t *testing.T) auth.ApiKey {
-	apiKey, err := authService.CreateKey(context.Background(), auth.CreateApiKeyParams{
-		Name: "readonly-test",
-		Role: auth.RoleReadonly,
-	})
-	require.NoError(t, err, "failed to create readonly key")
-	return apiKey
-}

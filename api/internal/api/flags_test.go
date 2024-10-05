@@ -287,7 +287,8 @@ func TestPutFlag_notFound(t *testing.T) {
 		IsPublic: true,
 		Type:     oapi.FlagInputTypeString,
 	}
-	updateFlagBody.Value.FromFlagInputValue1("xyz")
+	err := updateFlagBody.Value.FromFlagInputValue1("xyz")
+	require.NoError(t, err, "failed to set flag value")
 
 	updateFlagBodyBytes, err := json.Marshal(updateFlagBody)
 	require.NoError(t, err, "failed to marshal request body")

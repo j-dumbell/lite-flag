@@ -19,6 +19,9 @@ jobs:
       with:
         go-version: '1.21'
 
+    - name: oapi-codegen diff
+      run: make oapi-gen && git diff --exit-code
+
     - name: Test
       run: make test
 
