@@ -32,6 +32,7 @@ jobs:
       uses: golangci/golangci-lint-action@v6
       with:
         version: v1.58
+        working-directory: api
 
     - name: Build API
       run: make build-api
