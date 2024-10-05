@@ -169,6 +169,34 @@ paths:
         '409':
           description: API key with the given name already exists
 
+  /api-keys/{name}:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+        description: Name of the API key
+    delete:
+      summary: Delete an API key
+      tags:
+        - API keys
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '204':
+          description: Deleted API key
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: API key not found
+
   /api-keys/{name}/rotate:
     parameters:
       - in: path
@@ -200,6 +228,7 @@ paths:
                 type: object
         '404':
           description: API key not found
+
 
 components:
   schemas:

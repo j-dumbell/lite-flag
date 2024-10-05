@@ -32,31 +32,28 @@ func (srv *server) PostApiKeys(ctx context.Context, request oapi.PostApiKeysRequ
 	return oapi.PostApiKeys201JSONResponse(toApiKeyDTO(apiKey)), nil
 }
 
-// ToDo
-// func (srv *server) DeleteKey(r *http.Request) chix.Response {
-// 	name := chi.URLParam(r, "name")
-//
-// 	apiKeyRedacted, err := srv.authService.FindOneByName(r.Context(), name)
-// 	if err == auth.ErrKeyNotFound {
-// 		return chix.NotFound(nil)
-// 	} else if err != nil {
-// 		return chix.InternalServerError()
-// 	}
-//
-// 	requestor, _ := getUser(r.Context())
-// 	if apiKeyRedacted.Role == auth.RoleRoot {
-// 		return chix.Forbidden("root API key cannot be deleted")
-// 	}
-// 	if requestor.Role == auth.RoleAdmin && apiKeyRedacted.Role != auth.RoleReadonly {
-// 		return chix.Forbidden("admins may only delete API keys with readonly role")
-// 	}
-//
-// 	if err := srv.authService.DeleteByName(r.Context(), name); err != nil {
-// 		return chix.InternalServerError()
-// 	}
-//
-// 	return chix.OK(nil)
-// }
+func (srv *server) DeleteApiKeysName(ctx context.Context, request oapi.DeleteApiKeysNameRequestObject) (oapi.DeleteApiKeysNameResponseObject, error) {
+	apiKeyRedacted, err := srv.authService.FindOneByName(ctx, request.Name)
+	if errors.Is(err, auth.ErrKeyNotFound) {
+		return oapi.DeleteApiKeysName404Response{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	requestor, _ := getUser(ctx)
+	if apiKeyRedacted.Role == auth.RoleRoot {
+		return oapi.DeleteApiKeysName403JSONResponse(map[string]interface{}{"error": "root API key cannot be deleted"}), nil
+	}
+	if requestor.Role == auth.RoleAdmin && apiKeyRedacted.Role != auth.RoleReadonly {
+		return oapi.DeleteApiKeysName403JSONResponse(map[string]interface{}{"error": "admins may only delete readonly API keys"}), nil
+	}
+
+	if err := srv.authService.DeleteByName(ctx, request.Name); err != nil {
+		return nil, err
+	}
+
+	return oapi.DeleteApiKeysName204Response{}, nil
+}
 
 func (srv *server) PostApiKeysNameRotate(ctx context.Context, request oapi.PostApiKeysNameRotateRequestObject) (oapi.PostApiKeysNameRotateResponseObject, error) {
 	apiKeyRedacted, err := srv.authService.FindOneByName(ctx, request.Name)

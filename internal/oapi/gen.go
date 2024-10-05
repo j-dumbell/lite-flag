@@ -270,6 +270,9 @@ type ServerInterface interface {
 	// Create a new API key
 	// (POST /api-keys)
 	PostApiKeys(w http.ResponseWriter, r *http.Request)
+	// Delete an API key
+	// (DELETE /api-keys/{name})
+	DeleteApiKeysName(w http.ResponseWriter, r *http.Request, name string)
 	// Rotate an API key
 	// (POST /api-keys/{name}/rotate)
 	PostApiKeysNameRotate(w http.ResponseWriter, r *http.Request, name string)
@@ -300,6 +303,12 @@ type Unimplemented struct{}
 // Create a new API key
 // (POST /api-keys)
 func (_ Unimplemented) PostApiKeys(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete an API key
+// (DELETE /api-keys/{name})
+func (_ Unimplemented) DeleteApiKeysName(w http.ResponseWriter, r *http.Request, name string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -365,6 +374,37 @@ func (siw *ServerInterfaceWrapper) PostApiKeys(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostApiKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteApiKeysName operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiKeysName(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, ApiKeyAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiKeysName(w, r, name)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -675,6 +715,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api-keys", wrapper.PostApiKeys)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api-keys/{name}", wrapper.DeleteApiKeysName)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api-keys/{name}/rotate", wrapper.PostApiKeysNameRotate)
 	})
 	r.Group(func(r chi.Router) {
@@ -747,6 +790,47 @@ type PostApiKeys409Response struct {
 
 func (response PostApiKeys409Response) VisitPostApiKeysResponse(w http.ResponseWriter) error {
 	w.WriteHeader(409)
+	return nil
+}
+
+type DeleteApiKeysNameRequestObject struct {
+	Name string `json:"name"`
+}
+
+type DeleteApiKeysNameResponseObject interface {
+	VisitDeleteApiKeysNameResponse(w http.ResponseWriter) error
+}
+
+type DeleteApiKeysName204Response struct {
+}
+
+func (response DeleteApiKeysName204Response) VisitDeleteApiKeysNameResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteApiKeysName401Response struct {
+}
+
+func (response DeleteApiKeysName401Response) VisitDeleteApiKeysNameResponse(w http.ResponseWriter) error {
+	w.WriteHeader(401)
+	return nil
+}
+
+type DeleteApiKeysName403JSONResponse map[string]interface{}
+
+func (response DeleteApiKeysName403JSONResponse) VisitDeleteApiKeysNameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteApiKeysName404Response struct {
+}
+
+func (response DeleteApiKeysName404Response) VisitDeleteApiKeysNameResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
 	return nil
 }
 
@@ -964,6 +1048,9 @@ type StrictServerInterface interface {
 	// Create a new API key
 	// (POST /api-keys)
 	PostApiKeys(ctx context.Context, request PostApiKeysRequestObject) (PostApiKeysResponseObject, error)
+	// Delete an API key
+	// (DELETE /api-keys/{name})
+	DeleteApiKeysName(ctx context.Context, request DeleteApiKeysNameRequestObject) (DeleteApiKeysNameResponseObject, error)
 	// Rotate an API key
 	// (POST /api-keys/{name}/rotate)
 	PostApiKeysNameRotate(ctx context.Context, request PostApiKeysNameRotateRequestObject) (PostApiKeysNameRotateResponseObject, error)
@@ -1040,6 +1127,32 @@ func (sh *strictHandler) PostApiKeys(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PostApiKeysResponseObject); ok {
 		if err := validResponse.VisitPostApiKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteApiKeysName operation middleware
+func (sh *strictHandler) DeleteApiKeysName(w http.ResponseWriter, r *http.Request, name string) {
+	var request DeleteApiKeysNameRequestObject
+
+	request.Name = name
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteApiKeysName(ctx, request.(DeleteApiKeysNameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteApiKeysName")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteApiKeysNameResponseObject); ok {
+		if err := validResponse.VisitDeleteApiKeysNameResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

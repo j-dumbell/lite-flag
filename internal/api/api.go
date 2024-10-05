@@ -103,6 +103,7 @@ func New(db *sql.DB, flagService fflag.Service, authService auth.Service) chi.Ro
 	r.Get("/flags/{key}", wrapper.GetFlagsKey)
 
 	r.With(adminOnly).Post("/api-keys", wrapper.PostApiKeys)
+	r.With(adminOnly).Delete("/api-keys/{name}", wrapper.DeleteApiKeysName)
 	r.With(adminOnly).Post("/api-keys/{name}/rotate", wrapper.PostApiKeysNameRotate)
 
 	return r
