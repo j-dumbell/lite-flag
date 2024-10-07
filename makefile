@@ -42,3 +42,9 @@ oapi-gen:
 gen-clients:
 	openapi-generator generate -i ./oapi/spec.yaml -g typescript-axios -o ./clients/typescript && \
 	openapi-generator generate -i ./oapi/spec.yaml -g go -o ./clients/go
+
+push-bootstrap:
+	docker push jdumbell92/lite-flag:bootstrap-$(version)
+
+push-api:
+	docker push jdumbell92/lite-flag:api-$(version)
